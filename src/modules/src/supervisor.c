@@ -311,7 +311,7 @@ static supervisorConditionBits_t updateAndPopulateConditions(SupervisorMem_t* th
 
   const bool isTumbled = isTumbledCheck(this, sensors, currentTick);
   if (isTumbled) {
-    conditions |= SUPERVISOR_CB_IS_TUMBLED;
+    // conditions |= SUPERVISOR_CB_IS_TUMBLED;
   }
 
   const uint32_t setpointAge = currentTick - setpoint->timestamp;
@@ -335,7 +335,7 @@ static supervisorConditionBits_t updateAndPopulateConditions(SupervisorMem_t* th
   }
 
   if (supervisorIsCrashed()) {
-    conditions |= SUPERVISOR_CB_CRASHED;
+    // conditions |= SUPERVISOR_CB_CRASHED;
   }
 
   if (supervisorIsLandingTimeout(this, currentTick)) {
