@@ -43,8 +43,8 @@ static float phi_mocap = 0.0f;
 static bool use_observer = false;
 static bool reset_observer = false;
 static float MOCAP_HZ = 100.0f;
-static float Lambda = 0.0f;
-static uint8_t Ndiv = 0;
+// static float Lambda_z = 0.0f;
+// static uint8_t Ndiv_z = 0;
 
 // States
 // - Position
@@ -61,11 +61,11 @@ static float v_y_mocap = 0.0f;
 static float v_z_mocap = 0.0f;
 static uint32_t portcount = 0;
 // Encoder variables
-static float E0 = 1.0f;
+// static float E0 = 1.0f;
 // static const float Lambda = 1.020f;
 // static const unsigned char Ndiv = 15;
-static bool hasOverflowed = false;
-static uint16_t qk_count = 0;
+// static bool hasOverflowed = false;
+// static uint16_t qk_count = 0;
 
 // Setpoint
 static float p_x_des = 0.0f;
@@ -77,6 +77,9 @@ static float p_z_des = 0.0f;
 static attitude_t attitudeDesired;
 static attitude_t rateDesired;
 static float actuatorThrust;
+
+// Init an encoder object
+static encoder_t z_encoder = {1.0f, 1.02f, 15, false, 0};
 
 
 void ae483UpdateWithTOF(tofMeasurement_t *tof)
@@ -134,53 +137,55 @@ void ae483UpdateWithPose(poseMeasurement_t *meas)
 
 }
 
-bool decoder(const uint8_t qk)
+void decoder(const uint8_t qk, encoder_t* this)
 {
   // If the codeword is 'MAX_VALUE', we are zooming out.
   // DO NOT modify the state estimate.
-  if(qk == (Ndiv*Ndiv))
+  if(qk == (this->Ndiv*this->Ndiv))
   {
     // Do nothing.
     // DEBUG_PRINT("State overflowed\n");
-    return true;
+    this->hasOverflowed = true;
+    return;
   }
   else{
     // Unpack the received codeword to update state-estimates
     uint8_t qk_p_z, qk_v_z, qk_copy;
 
     qk_copy = qk;
-    qk_p_z = qk_copy % Ndiv;
-    qk_copy = qk_copy / Ndiv;
-    qk_v_z = qk_copy % Ndiv;
+    qk_p_z = qk_copy % this->Ndiv;
+    qk_copy = qk_copy / this->Ndiv;
+    qk_v_z = qk_copy % this->Ndiv;
     
-    float delta = 2.0f * E0 / Ndiv;
+    float delta = 2.0f * this->E0 / this->Ndiv;
 
-    p_z_mocap = -E0 + p_z + delta/2.0f + qk_p_z*delta;
-    v_z_mocap = -E0 + v_z + delta/2.0f + qk_v_z*delta;
+    p_z_mocap = -this->E0 + p_z + delta/2.0f + qk_p_z*delta;
+    v_z_mocap = -this->E0 + v_z + delta/2.0f + qk_v_z*delta;
 
     p_z = p_z_mocap;
     v_z = v_z_mocap;
 
-    return false;
+    this->hasOverflowed = false;
+    return;
   }
 }
 
-void updateBoundingBox(const bool hasOverflowed)
+void updateBoundingBox(encoder_t *this)
 {
-  if(hasOverflowed)
+  if(this->hasOverflowed)
   {
-    E0 = 1.0f;
-    for(int i=0; i<3*qk_count; i++)
+    this->E0 = 1.0f;
+    for(int i=0; i<3*this->qk_count; i++)
     {
-      E0 *= (qk_count * Lambda);
+      this->E0 *= (this->qk_count * this->Lambda);
     }
 
-    qk_count += 1;
+    this->qk_count += 1;
   }
   else
   {
-    E0 *= (Lambda / Ndiv);
-    qk_count = 0;
+    this->E0 *= (this->Lambda / this->Ndiv);
+    this->qk_count = 0;
   }
 }
 
@@ -207,11 +212,11 @@ void ae483UpdateWithData(const struct AE483Data* data)
   // v_z_mocap = data->v_z;
 
   // Decoder for z-position subsystem
-  hasOverflowed = decoder(data->qk);
+  decoder(data->qk, &z_encoder);
 
   // Update the size of the bounding box.
   // E0 is modified IN-PLACE
-  updateBoundingBox(hasOverflowed);
+  updateBoundingBox(&z_encoder);
 
 }
 
@@ -299,7 +304,7 @@ void controllerAE483(control_t *control,
     // For the z-position subsystem, we integrate the closed-loop
     // system.
     // if(setpoint->mode.z != modeDisable)
-    if(hasOverflowed)
+    if(z_encoder.hasOverflowed)
     {
       actuatorThrust = 36000.0f;
 
@@ -385,7 +390,7 @@ LOG_ADD(LOG_FLOAT,       v_z_mocap,              &v_z_mocap)
 LOG_ADD(LOG_FLOAT,       psi_mocap,              &psi_mocap)
 LOG_ADD(LOG_FLOAT,       theta_mocap,            &theta_mocap)
 LOG_ADD(LOG_FLOAT,       phi_mocap,              &phi_mocap)
-LOG_ADD(LOG_FLOAT,       E0,                     &E0)
+LOG_ADD(LOG_FLOAT,       E0_z,                   &z_encoder.E0)
 LOG_ADD(LOG_FLOAT,       p_x,                    &p_x)
 LOG_ADD(LOG_FLOAT,       p_y,                    &p_y)
 LOG_ADD(LOG_FLOAT,       p_z,                    &p_z)
@@ -403,7 +408,7 @@ LOG_GROUP_STOP(ae483log)
 PARAM_GROUP_START(ae483par)
 PARAM_ADD(PARAM_UINT8,     use_observer,            &use_observer)
 PARAM_ADD(PARAM_UINT8,     reset_observer,          &reset_observer)
-PARAM_ADD(PARAM_UINT8,     Ndiv,                    &Ndiv)
+PARAM_ADD(PARAM_UINT8,     Ndiv_z,                  &z_encoder.Ndiv)
 PARAM_ADD(PARAM_FLOAT,     MOCAP_HZ,                &MOCAP_HZ)
-PARAM_ADD(PARAM_FLOAT,     Lambda,                  &Lambda)
+PARAM_ADD(PARAM_FLOAT,     Lambda_z,                &z_encoder.Lambda)
 PARAM_GROUP_STOP(ae483par)

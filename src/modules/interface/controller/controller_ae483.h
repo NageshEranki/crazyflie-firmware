@@ -3,6 +3,21 @@
 
 #include "stabilizer_types.h"
 
+
+// Custom struct to hold some coding scheme parameters.
+// x, y & z position subsystems are modelled as 3 independent
+// double-integrator systems so this struct will provide some
+// modularity in code.
+typedef struct {
+
+  float E0;
+  float Lambda;
+  uint8_t Ndiv;
+  bool hasOverflowed;
+  uint16_t qk_count;
+
+} encoder_t;
+
 // An example struct to hold AE483-specific data sent from client to drone
 struct AE483Data
 {
