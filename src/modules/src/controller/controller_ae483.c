@@ -44,7 +44,7 @@ static bool use_observer = false;
 static bool reset_observer = false;
 static float MOCAP_HZ = 100.0f;
 static float Lambda = 0.0f;
-static unsigned char Ndiv = 0;
+static uint8_t Ndiv = 0;
 
 // States
 // - Position
@@ -134,19 +134,24 @@ void ae483UpdateWithPose(poseMeasurement_t *meas)
 
 }
 
-bool decoder(const int16_t qk_p_z, const int16_t qk_v_z)
+bool decoder(const uint8_t qk)
 {
-  // If the codeword is '-1', we are zooming out.
+  // If the codeword is 'MAX_VALUE', we are zooming out.
   // DO NOT modify the state estimate.
-  if(qk_p_z == -1)
+  if(qk == (Ndiv*Ndiv))
   {
     // Do nothing.
     // DEBUG_PRINT("State overflowed\n");
-
     return true;
   }
-  
   else{
+    // Unpack the received codeword to update state-estimates
+    uint8_t qk_p_z, qk_v_z, qk_copy;
+
+    qk_copy = qk;
+    qk_p_z = qk_copy % Ndiv;
+    qk_copy = qk_copy / Ndiv;
+    qk_v_z = qk_copy % Ndiv;
     
     float delta = 2.0f * E0 / Ndiv;
 
@@ -202,7 +207,7 @@ void ae483UpdateWithData(const struct AE483Data* data)
   // v_z_mocap = data->v_z;
 
   // Decoder for z-position subsystem
-  hasOverflowed = decoder(data->qk_p_z, data->qk_v_z);
+  hasOverflowed = decoder(data->qk);
 
   // Update the size of the bounding box.
   // E0 is modified IN-PLACE
