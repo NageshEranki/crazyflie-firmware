@@ -43,29 +43,23 @@ static float phi_mocap = 0.0f;
 static bool use_observer = false;
 static bool reset_observer = false;
 static float MOCAP_HZ = 100.0f;
-// static float Lambda_z = 0.0f;
-// static uint8_t Ndiv_z = 0;
+
 
 // States
 // - Position
 static float p_x = 0.0f;
-static float p_y = 0.0f;
-static float p_z = 0.0f;
+// static float p_y = 0.0f;
+// static float p_z = 0.0f;
 // - Velocity
 static float v_x = 0.0f;
-static float v_y = 0.0f;
-static float v_z = 0.0f;
+// static float v_y = 0.0f;
+// static float v_z = 0.0f;
 // - Velocity (based on mocap, finite differences)
 static float v_x_mocap = 0.0f;
 static float v_y_mocap = 0.0f;
 static float v_z_mocap = 0.0f;
 static uint32_t portcount = 0;
-// Encoder variables
-// static float E0 = 1.0f;
-// static const float Lambda = 1.020f;
-// static const unsigned char Ndiv = 15;
-// static bool hasOverflowed = false;
-// static uint16_t qk_count = 0;
+
 
 // Setpoint
 static float p_x_des = 0.0f;
@@ -78,8 +72,9 @@ static attitude_t attitudeDesired;
 static attitude_t rateDesired;
 static float actuatorThrust;
 
-// Init an encoder object
-static encoder_t z_encoder = {1.0f, 1.02f, 15, false, 0};
+// Init encoder objects
+static encoder_t z_encoder = {0.0f, 0.0f, 1.0f, 1.02f, 15, false, 0};
+static encoder_t y_encoder = {0.0f, 0.0f, 1.0f, 1.02f, 15, false, 0};
 
 
 void ae483UpdateWithTOF(tofMeasurement_t *tof)
@@ -143,7 +138,6 @@ void decoder(const uint8_t qk, encoder_t* this)
   // DO NOT modify the state estimate.
   if(qk == (this->Ndiv*this->Ndiv))
   {
-    // Do nothing.
     // DEBUG_PRINT("State overflowed\n");
     this->hasOverflowed = true;
     return;
@@ -159,11 +153,11 @@ void decoder(const uint8_t qk, encoder_t* this)
     
     float delta = 2.0f * this->E0 / this->Ndiv;
 
-    p_z_mocap = -this->E0 + p_z + delta/2.0f + qk_p_z*delta;
-    v_z_mocap = -this->E0 + v_z + delta/2.0f + qk_v_z*delta;
+    this->p_hat = -this->E0 + this->p_hat + delta/2.0f + qk_p_z*delta;
+    this->v_hat = -this->E0 + this->v_hat + delta/2.0f + qk_v_z*delta;
 
-    p_z = p_z_mocap;
-    v_z = v_z_mocap;
+    // p_z = p_z_mocap;
+    // v_z = v_z_mocap;
 
     this->hasOverflowed = false;
     return;
@@ -175,7 +169,7 @@ void updateBoundingBox(encoder_t *this)
   if(this->hasOverflowed)
   {
     this->E0 = 1.0f;
-    for(int i=0; i<3*this->qk_count; i++)
+    for(uint16_t i=0; i<3*this->qk_count; i++)
     {
       this->E0 *= (this->qk_count * this->Lambda);
     }
@@ -203,19 +197,23 @@ void ae483UpdateWithData(const struct AE483Data* data)
   
   // Position
   p_x_mocap = data->p_x;
-  p_y_mocap = data->p_y;
+  // p_y_mocap = data->p_y;
   // p_z_mocap = data->p_z;
 
   // Velocity
   v_x_mocap = data->v_x;
-  v_y_mocap = data->v_y;
+  // v_y_mocap = data->v_y;
   // v_z_mocap = data->v_z;
 
+  // Decoder for y-position subsystem
+  decoder(data->qk_y, &y_encoder);
+
   // Decoder for z-position subsystem
-  decoder(data->qk, &z_encoder);
+  decoder(data->qk_z, &z_encoder);
 
   // Update the size of the bounding box.
   // E0 is modified IN-PLACE
+  updateBoundingBox(&y_encoder);
   updateBoundingBox(&z_encoder);
 
 }
@@ -269,11 +267,11 @@ void controllerAE483(control_t *control,
     if(reset_observer)
     {
       p_x = 0.0f;
-      p_y = 0.0f;
-      p_z = 0.0f;
+      y_encoder.p_hat = 0.0f;
+      z_encoder.p_hat = 0.0f;
       v_x = 0.0f;
-      v_y = 0.0f;
-      v_z = 0.0f;
+      y_encoder.v_hat = 0.0f;
+      z_encoder.v_hat = 0.0f;
 
       p_x_mocap = 0.0f;
       p_y_mocap = 0.0f;
@@ -286,38 +284,48 @@ void controllerAE483(control_t *control,
     }
     // - Position
     p_x = p_x_mocap;
-    p_y = p_y_mocap;
 
     // - Velocity
     v_x = v_x_mocap;
-    v_y = v_y_mocap;
 
-    // Feedback for position subsystem
+    // Feedback for x-position subsystem
     attitudeDesired.pitch = -50.0f * (p_x_des - p_x) + 25.0f * (v_x);
-    attitudeDesired.roll = -50.0f * (p_y_des - p_y) + 25.0f * (v_y);
 
+    // For the y-position subsystem, we integrate the closed-loop
+    // system.
+    if(y_encoder.hasOverflowed)
+    {
+      attitudeDesired.roll = 0.0f;
 
-    // saturate control inputs
-    attitudeDesired.pitch = constrain(attitudeDesired.pitch, -pLimit, pLimit);
-    attitudeDesired.roll = constrain(attitudeDesired.roll, -rLimit, rLimit);
+      y_encoder.p_hat += ((float)(1.0f/POSITION_RATE) * y_encoder.v_hat);
+    }
+    else
+    {
+      attitudeDesired.roll = -50.0f * (p_y_des - y_encoder.p_hat) + 25.0f * (y_encoder.v_hat);
+
+      y_encoder.p_hat += ((float)(1.0f/POSITION_RATE) * y_encoder.v_hat);
+      y_encoder.v_hat += ((float)(1.0f/POSITION_RATE) * (-8.560f*(y_encoder.p_hat-p_y_des) - 4.280f*y_encoder.v_hat));
+    }
 
     // For the z-position subsystem, we integrate the closed-loop
     // system.
-    // if(setpoint->mode.z != modeDisable)
     if(z_encoder.hasOverflowed)
     {
       actuatorThrust = 36000.0f;
 
-      p_z += ((float)(1.0f/POSITION_RATE) * v_z);
+      z_encoder.p_hat += ((float)(1.0f/POSITION_RATE) * z_encoder.v_hat);
     }
     else
     {
-      actuatorThrust = 1000.0f * (50.0f * (p_z_des - p_z) - 25.0f * (v_z)) + 36000.0f;
+      actuatorThrust = 1000.0f * (50.0f * (p_z_des - z_encoder.p_hat) - 25.0f * (z_encoder.v_hat)) + 36000.0f;
 
-      p_z += ((float)(1.0f/POSITION_RATE) * v_z);
-      v_z += ((float)(1.0f/POSITION_RATE) * (-11.662f*(p_z-p_z_des) - 5.831f*v_z));
+      z_encoder.p_hat += ((float)(1.0f/POSITION_RATE) * z_encoder.v_hat);
+      z_encoder.v_hat += ((float)(1.0f/POSITION_RATE) * (-11.662f*(z_encoder.p_hat-p_z_des) - 5.831f*z_encoder.v_hat));
     }
 
+    // saturate control inputs
+    attitudeDesired.pitch = constrain(attitudeDesired.pitch, -pLimit, pLimit);
+    attitudeDesired.roll = constrain(attitudeDesired.roll, -rLimit, rLimit);
     actuatorThrust = constrain(actuatorThrust, 0, UINT16_MAX);
 
   }
@@ -374,6 +382,12 @@ void controllerAE483(control_t *control,
     // Reset the calculated YAW angle for rate control
     attitudeDesired.yaw = state->attitude.yaw;
   }
+
+  // Uncomment if you are running a Processor-in-loop test
+  // control->thrust = 0;
+  // control->roll = 0;
+  // control->pitch = 0;
+  // control->yaw = 0;
 }
 
 // 1234567890123456789012345678 <-- max total length
@@ -391,12 +405,13 @@ LOG_ADD(LOG_FLOAT,       psi_mocap,              &psi_mocap)
 LOG_ADD(LOG_FLOAT,       theta_mocap,            &theta_mocap)
 LOG_ADD(LOG_FLOAT,       phi_mocap,              &phi_mocap)
 LOG_ADD(LOG_FLOAT,       E0_z,                   &z_encoder.E0)
+LOG_ADD(LOG_FLOAT,       E0_y,                   &y_encoder.E0)
 LOG_ADD(LOG_FLOAT,       p_x,                    &p_x)
-LOG_ADD(LOG_FLOAT,       p_y,                    &p_y)
-LOG_ADD(LOG_FLOAT,       p_z,                    &p_z)
+LOG_ADD(LOG_FLOAT,       p_y,                    &y_encoder.p_hat)
+LOG_ADD(LOG_FLOAT,       p_z,                    &z_encoder.p_hat)
 LOG_ADD(LOG_FLOAT,       v_x,                    &v_x)
-LOG_ADD(LOG_FLOAT,       v_y,                    &v_y)
-LOG_ADD(LOG_FLOAT,       v_z,                    &v_z)
+LOG_ADD(LOG_FLOAT,       v_y,                    &y_encoder.v_hat)
+LOG_ADD(LOG_FLOAT,       v_z,                    &z_encoder.v_hat)
 LOG_ADD(LOG_FLOAT,       p_x_des,                &p_x_des)
 LOG_ADD(LOG_FLOAT,       p_y_des,                &p_y_des)
 LOG_ADD(LOG_FLOAT,       p_z_des,                &p_z_des)
@@ -408,7 +423,9 @@ LOG_GROUP_STOP(ae483log)
 PARAM_GROUP_START(ae483par)
 PARAM_ADD(PARAM_UINT8,     use_observer,            &use_observer)
 PARAM_ADD(PARAM_UINT8,     reset_observer,          &reset_observer)
-PARAM_ADD(PARAM_UINT8,     Ndiv_z,                  &z_encoder.Ndiv)
 PARAM_ADD(PARAM_FLOAT,     MOCAP_HZ,                &MOCAP_HZ)
+PARAM_ADD(PARAM_UINT8,     Ndiv_z,                  &z_encoder.Ndiv)
 PARAM_ADD(PARAM_FLOAT,     Lambda_z,                &z_encoder.Lambda)
+PARAM_ADD(PARAM_UINT8,     Ndiv_y,                  &y_encoder.Ndiv)
+PARAM_ADD(PARAM_FLOAT,     Lambda_y,                &y_encoder.Lambda)
 PARAM_GROUP_STOP(ae483par)

@@ -10,6 +10,8 @@
 // modularity in code.
 typedef struct {
 
+  float p_hat;
+  float v_hat;
   float E0;
   float Lambda;
   uint8_t Ndiv;
@@ -23,14 +25,17 @@ struct AE483Data
 {
 
   float p_x;
-  float p_y;
+  // float p_y;
 
   // Hold linear velocities
   float v_x;
-  float v_y;
+  // float v_y;
 
-  // Encoded state measurement
-  uint8_t qk;
+  // Encoded state measurement for y-position
+  uint8_t qk_y;
+
+  // Encoded state measurement for z-position
+  uint8_t qk_z;
 
 } __attribute__((packed));
 
