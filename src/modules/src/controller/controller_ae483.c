@@ -296,16 +296,16 @@ void controllerAE483(control_t *control,
     // if(setpoint->mode.z != modeDisable)
     if(hasOverflowed)
     {
-      actuatorThrust = 36000.0f;
+      actuatorThrust = 40000.0f;
 
       p_z += ((float)(1.0f/POSITION_RATE) * v_z);
     }
     else
     {
-      actuatorThrust = 1000.0f * (50.0f * (p_z_des - p_z) - 25.0f * (v_z)) + 36000.0f;
+      actuatorThrust = 1000.0f * (85.0f * (p_z_des - p_z) - 17.0f * (v_z)) + 40000.0f;
 
       p_z += ((float)(1.0f/POSITION_RATE) * v_z);
-      v_z += ((float)(1.0f/POSITION_RATE) * (-11.662f*(p_z-p_z_des) - 5.831f*v_z));
+      v_z += ((float)(1.0f/POSITION_RATE) * (-19.8254f*(p_z-p_z_des) - 5.831f*v_z));
     }
 
     actuatorThrust = constrain(actuatorThrust, 0, UINT16_MAX);
