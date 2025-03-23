@@ -311,16 +311,16 @@ void controllerAE483(control_t *control,
     // system.
     if(z_encoder.hasOverflowed)
     {
-      actuatorThrust = 36000.0f;
+      actuatorThrust = 40000.0f;
 
       z_encoder.p_hat += ((float)(1.0f/POSITION_RATE) * z_encoder.v_hat);
     }
     else
     {
-      actuatorThrust = 1000.0f * (50.0f * (p_z_des - z_encoder.p_hat) - 25.0f * (z_encoder.v_hat)) + 36000.0f;
+      actuatorThrust = 1000.0f * (85.0f * (p_z_des - z_encoder.p_hat) - 17.0f * (z_encoder.v_hat)) + 40000.0f;
 
       z_encoder.p_hat += ((float)(1.0f/POSITION_RATE) * z_encoder.v_hat);
-      z_encoder.v_hat += ((float)(1.0f/POSITION_RATE) * (-11.662f*(z_encoder.p_hat-p_z_des) - 5.831f*z_encoder.v_hat));
+      z_encoder.v_hat += ((float)(1.0f/POSITION_RATE) * (-19.8254f*(z_encoder.p_hat-p_z_des) - 5.831f*z_encoder.v_hat));
     }
 
     // saturate control inputs
