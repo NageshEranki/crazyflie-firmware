@@ -291,7 +291,7 @@ void controllerAE483(control_t *control,
       actuatorThrust = 1000.0f * (85.0f * (p_z_des - z_encoder.p_hat) - 17.0f * (z_encoder.v_hat)) + 40000.0f;
 
       z_encoder.p_hat += ((float)(1.0f/POSITION_RATE) * z_encoder.v_hat);
-      z_encoder.v_hat += ((float)(1.0f/POSITION_RATE) * (-19.8254f*(z_encoder.p_hat-p_z_des) - 5.831f*z_encoder.v_hat));
+      z_encoder.v_hat += ((float)(1.0f/POSITION_RATE) * (-19.8254f*(z_encoder.p_hat-p_z_des) - 3.96508f*z_encoder.v_hat));
     }
 
     // saturate control inputs
@@ -367,8 +367,9 @@ LOG_GROUP_START(ae483log)
 LOG_ADD(LOG_UINT16,      num_tof,                &tof_count)
 LOG_ADD(LOG_UINT16,      num_flow,               &flow_count)
 // LOG_ADD(LOG_FLOAT,       p_x_mocap,              &p_x_mocap)
-LOG_ADD(LOG_FLOAT,       E0_z,                   &z_encoder.E0)
+LOG_ADD(LOG_FLOAT,       E0_x,                   &x_encoder.E0)
 LOG_ADD(LOG_FLOAT,       E0_y,                   &y_encoder.E0)
+LOG_ADD(LOG_FLOAT,       E0_z,                   &z_encoder.E0)
 LOG_ADD(LOG_FLOAT,       p_x,                    &x_encoder.p_hat)
 LOG_ADD(LOG_FLOAT,       p_y,                    &y_encoder.p_hat)
 LOG_ADD(LOG_FLOAT,       p_z,                    &z_encoder.p_hat)
