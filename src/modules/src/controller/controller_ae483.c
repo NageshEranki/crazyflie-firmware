@@ -31,33 +31,12 @@ static float tof_distance = 0.0f;
 static uint16_t flow_count = 0;
 static float flow_dpixelx = 0.0f;
 static float flow_dpixely = 0.0f;
-// - Mocap data
-static float p_x_mocap = 0.0f;
-static float p_y_mocap = 0.0f;
-static float p_z_mocap = 0.0f;
-static float psi_mocap = 0.0f;
-static float theta_mocap = 0.0f;
-static float phi_mocap = 0.0f;
 
-// Parameters
+
+// Observer switches
 static bool use_observer = false;
 static bool reset_observer = false;
-static float MOCAP_HZ = 100.0f;
 
-
-// States
-// - Position
-static float p_x = 0.0f;
-// static float p_y = 0.0f;
-// static float p_z = 0.0f;
-// - Velocity
-static float v_x = 0.0f;
-// static float v_y = 0.0f;
-// static float v_z = 0.0f;
-// - Velocity (based on mocap, finite differences)
-static float v_x_mocap = 0.0f;
-static float v_y_mocap = 0.0f;
-static float v_z_mocap = 0.0f;
 static uint32_t portcount = 0;
 
 
@@ -67,14 +46,15 @@ static float p_y_des = 0.0f;
 static float p_z_des = 0.0f;
 
 
-// Control inputs for position subsystem
+// Control inputs for position subsystem a.k.a attitude setpoints
 static attitude_t attitudeDesired;
 static attitude_t rateDesired;
 static float actuatorThrust;
 
 // Init encoder objects
-static encoder_t z_encoder = {0.0f, 0.0f, 1.0f, 1.02f, 15, false, 0};
+static encoder_t x_encoder = {0.0f, 0.0f, 1.0f, 1.02f, 15, false, 0};
 static encoder_t y_encoder = {0.0f, 0.0f, 1.0f, 1.02f, 15, false, 0};
+static encoder_t z_encoder = {0.0f, 0.0f, 1.0f, 1.02f, 15, false, 0};
 
 
 void ae483UpdateWithTOF(tofMeasurement_t *tof)
@@ -156,9 +136,6 @@ void decoder(const uint8_t qk, encoder_t* this)
     this->p_hat = -this->E0 + this->p_hat + delta/2.0f + qk_p_z*delta;
     this->v_hat = -this->E0 + this->v_hat + delta/2.0f + qk_v_z*delta;
 
-    // p_z = p_z_mocap;
-    // v_z = v_z_mocap;
-
     this->hasOverflowed = false;
     return;
   }
@@ -195,24 +172,14 @@ void ae483UpdateWithData(const struct AE483Data* data)
   //
   // Exactly what "x", "y", and "z" mean in this context is up to you.
   
-  // Position
-  p_x_mocap = data->p_x;
-  // p_y_mocap = data->p_y;
-  // p_z_mocap = data->p_z;
-
-  // Velocity
-  v_x_mocap = data->v_x;
-  // v_y_mocap = data->v_y;
-  // v_z_mocap = data->v_z;
-
-  // Decoder for y-position subsystem
+  // Iterate decoders
+  decoder(data->qk_x, &x_encoder);
   decoder(data->qk_y, &y_encoder);
-
-  // Decoder for z-position subsystem
   decoder(data->qk_z, &z_encoder);
 
-  // Update the size of the bounding box.
-  // E0 is modified IN-PLACE
+  //  Update the size of the bounding box.
+  // 'updateBoundingBox' modifies the 'E0' member variable
+  updateBoundingBox(&x_encoder);
   updateBoundingBox(&y_encoder);
   updateBoundingBox(&z_encoder);
 
@@ -266,30 +233,34 @@ void controllerAE483(control_t *control,
     // FIXME: Insert custom observer here
     if(reset_observer)
     {
-      p_x = 0.0f;
+
+      // Reset all decoder state estimates
+      x_encoder.p_hat = 0.0f;
       y_encoder.p_hat = 0.0f;
       z_encoder.p_hat = 0.0f;
-      v_x = 0.0f;
+
+      x_encoder.v_hat = 0.0f;
       y_encoder.v_hat = 0.0f;
       z_encoder.v_hat = 0.0f;
 
-      p_x_mocap = 0.0f;
-      p_y_mocap = 0.0f;
-      p_z_mocap = 0.0f;
-      v_x_mocap = 0.0f;
-      v_y_mocap = 0.0f;
-      v_z_mocap = 0.0f;
-
       reset_observer = false;
     }
-    // - Position
-    p_x = p_x_mocap;
 
-    // - Velocity
-    v_x = v_x_mocap;
+    // For the x-position subsystem, we integrate the closed-loop
+    // system.
+    if(x_encoder.hasOverflowed)
+    {
+      attitudeDesired.pitch = 0.0f;
 
-    // Feedback for x-position subsystem
-    attitudeDesired.pitch = -50.0f * (p_x_des - p_x) + 25.0f * (v_x);
+      x_encoder.p_hat += ((float)(1.0f/POSITION_RATE) * x_encoder.v_hat);
+    }
+    else
+    {
+      attitudeDesired.pitch = -50.0f * (p_x_des - x_encoder.p_hat) + 25.0f * (x_encoder.v_hat);
+
+      x_encoder.p_hat += ((float)(1.0f/POSITION_RATE) * x_encoder.v_hat);
+      x_encoder.v_hat += ((float)(1.0f/POSITION_RATE) * (-8.560f*(x_encoder.p_hat-p_x_des) - 4.280f*x_encoder.v_hat));
+    }
 
     // For the y-position subsystem, we integrate the closed-loop
     // system.
@@ -383,7 +354,7 @@ void controllerAE483(control_t *control,
     attitudeDesired.yaw = state->attitude.yaw;
   }
 
-  // Uncomment if you are running a Processor-in-loop test
+  // // Uncomment if you are running a Processor-in-loop test
   // control->thrust = 0;
   // control->roll = 0;
   // control->pitch = 0;
@@ -395,21 +366,13 @@ void controllerAE483(control_t *control,
 LOG_GROUP_START(ae483log)
 LOG_ADD(LOG_UINT16,      num_tof,                &tof_count)
 LOG_ADD(LOG_UINT16,      num_flow,               &flow_count)
-LOG_ADD(LOG_FLOAT,       p_x_mocap,              &p_x_mocap)
-LOG_ADD(LOG_FLOAT,       p_y_mocap,              &p_y_mocap)
-LOG_ADD(LOG_FLOAT,       p_z_mocap,              &p_z_mocap)
-LOG_ADD(LOG_FLOAT,       v_x_mocap,              &v_x_mocap)
-LOG_ADD(LOG_FLOAT,       v_y_mocap,              &v_y_mocap)
-LOG_ADD(LOG_FLOAT,       v_z_mocap,              &v_z_mocap)
-LOG_ADD(LOG_FLOAT,       psi_mocap,              &psi_mocap)
-LOG_ADD(LOG_FLOAT,       theta_mocap,            &theta_mocap)
-LOG_ADD(LOG_FLOAT,       phi_mocap,              &phi_mocap)
+// LOG_ADD(LOG_FLOAT,       p_x_mocap,              &p_x_mocap)
 LOG_ADD(LOG_FLOAT,       E0_z,                   &z_encoder.E0)
 LOG_ADD(LOG_FLOAT,       E0_y,                   &y_encoder.E0)
-LOG_ADD(LOG_FLOAT,       p_x,                    &p_x)
+LOG_ADD(LOG_FLOAT,       p_x,                    &x_encoder.p_hat)
 LOG_ADD(LOG_FLOAT,       p_y,                    &y_encoder.p_hat)
 LOG_ADD(LOG_FLOAT,       p_z,                    &z_encoder.p_hat)
-LOG_ADD(LOG_FLOAT,       v_x,                    &v_x)
+LOG_ADD(LOG_FLOAT,       v_x,                    &x_encoder.v_hat)
 LOG_ADD(LOG_FLOAT,       v_y,                    &y_encoder.v_hat)
 LOG_ADD(LOG_FLOAT,       v_z,                    &z_encoder.v_hat)
 LOG_ADD(LOG_FLOAT,       p_x_des,                &p_x_des)
@@ -423,9 +386,10 @@ LOG_GROUP_STOP(ae483log)
 PARAM_GROUP_START(ae483par)
 PARAM_ADD(PARAM_UINT8,     use_observer,            &use_observer)
 PARAM_ADD(PARAM_UINT8,     reset_observer,          &reset_observer)
-PARAM_ADD(PARAM_FLOAT,     MOCAP_HZ,                &MOCAP_HZ)
-PARAM_ADD(PARAM_UINT8,     Ndiv_z,                  &z_encoder.Ndiv)
-PARAM_ADD(PARAM_FLOAT,     Lambda_z,                &z_encoder.Lambda)
+PARAM_ADD(PARAM_UINT8,     Ndiv_x,                  &x_encoder.Ndiv)
+PARAM_ADD(PARAM_FLOAT,     Lambda_x,                &x_encoder.Lambda)
 PARAM_ADD(PARAM_UINT8,     Ndiv_y,                  &y_encoder.Ndiv)
 PARAM_ADD(PARAM_FLOAT,     Lambda_y,                &y_encoder.Lambda)
+PARAM_ADD(PARAM_UINT8,     Ndiv_z,                  &z_encoder.Ndiv)
+PARAM_ADD(PARAM_FLOAT,     Lambda_z,                &z_encoder.Lambda)
 PARAM_GROUP_STOP(ae483par)
