@@ -3,6 +3,7 @@ menu "Controllers and Estimators"
 choice
     prompt "Default controller"
     default CONFIG_CONTROLLER_AUTO_SELECT
+    depends on !CONTROLLER_OOT
 
 config CONTROLLER_AUTO_SELECT
     bool "Auto select Controller"
@@ -40,6 +41,11 @@ config CONTROLLER_BRESCIANINI
     bool "Brescianini controller"
     help
         Use the Brescianini controller as default
+
+config CONTROLLER_LEE
+    bool "Lee controller"
+    help
+        Use the Lee controller as default
 
 endchoice
 
@@ -205,7 +211,7 @@ config ENABLE_THRUST_BAT_COMPENSATED
     help
         Compensate thrust depending on battery voltage so it will produce about the same
         amount of thrust independent of the battery voltage.
-        The compensation is based on thrust measurements, which are only valid for CF2.X stock configuration.
+        The compensation is based on thrust measurements, which are only valid for CF2.1 stock configuration.
         Not applied for brushless motor setup.
 
 config LOG_MOTOR_CAP_WARNING
