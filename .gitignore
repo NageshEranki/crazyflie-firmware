@@ -51,3 +51,5 @@ tools/dependency/web/data.js
 src/modules/src/controller/math_equations.ipynb
 .DS_Store
 vendor/CMSIS
+examples/app_appchannel_test/src/appchannel_test.c
+examples/app_appchannel_test/src/appchannel_test.c
