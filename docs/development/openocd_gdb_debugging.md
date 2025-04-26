@@ -121,7 +121,7 @@ The link to gdb-multiarch is required because Ubuntu does not ship arm-none-eabi
 #### Mac OS
 
     brew install open-ocd
-    brew tap PX4/homebrew-px
+    brew tap PX4/homebrew-px4
     brew install arm-none-eabi-gcc
 
 ### Install the Cortex Debug Extension
