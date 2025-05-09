@@ -12,6 +12,12 @@
 #include "math3d.h"
 
 #include "debug.h"
+#include "eventtrigger.h"
+
+EVENTTRIGGER(error_event, float, Ex, float, Ey, float, Ez)
+EVENTTRIGGER(pos_event, float, px, float, py, float, pz)
+EVENTTRIGGER(vel_event, float, vx, float, vy, float, vz)
+EVENTTRIGGER(code_event, uint8, qkx, uint8, qky, uint8, qkz)
 
 #define DEBUG_MODULE "CONTROLLER AE483"
 #define ATTITUDE_UPDATE_DT    (float)(1.0f/ATTITUDE_RATE)
@@ -52,9 +58,9 @@ static attitude_t rateDesired;
 static float actuatorThrust;
 
 // Init encoder objects
-static encoder_t x_encoder = {0.0f, 0.0f, 1.0f, 1.02f, 15, false, 0};
-static encoder_t y_encoder = {0.0f, 0.0f, 1.0f, 1.02f, 15, false, 0};
-static encoder_t z_encoder = {0.0f, 0.0f, 1.0f, 1.02f, 15, false, 0};
+static encoder_t x_encoder = {0.0f, 0.0f, 1.0f, 1.01f, 15, false, 0};
+static encoder_t y_encoder = {0.0f, 0.0f, 1.0f, 1.01f, 15, false, 0};
+static encoder_t z_encoder = {0.0f, 0.0f, 1.0f, 1.01f, 15, false, 0};
 
 
 void ae483UpdateWithTOF(tofMeasurement_t *tof)
@@ -171,7 +177,21 @@ void ae483UpdateWithData(const struct AE483Data* data)
   //  data->z         float
   //
   // Exactly what "x", "y", and "z" mean in this context is up to you.
-  
+  eventTrigger_code_event_payload.qkx = data->qk_x;
+  eventTrigger_code_event_payload.qky = data->qk_y;
+  eventTrigger_code_event_payload.qkz = data->qk_z;
+  eventTrigger(&eventTrigger_code_event);
+
+  eventTrigger_pos_event_payload.px = x_encoder.p_hat;
+  eventTrigger_pos_event_payload.py = y_encoder.p_hat;
+  eventTrigger_pos_event_payload.pz = z_encoder.p_hat;
+  eventTrigger(&eventTrigger_pos_event);
+
+  eventTrigger_vel_event_payload.vx = x_encoder.v_hat;
+  eventTrigger_vel_event_payload.vy = y_encoder.v_hat;
+  eventTrigger_vel_event_payload.vz = z_encoder.v_hat;
+  eventTrigger(&eventTrigger_vel_event);
+
   // Iterate decoders
   decoder(data->qk_x, &x_encoder);
   decoder(data->qk_y, &y_encoder);
@@ -183,6 +203,10 @@ void ae483UpdateWithData(const struct AE483Data* data)
   updateBoundingBox(&y_encoder);
   updateBoundingBox(&z_encoder);
 
+  eventTrigger_error_event_payload.Ex = x_encoder.E0;
+  eventTrigger_error_event_payload.Ey = y_encoder.E0;
+  eventTrigger_error_event_payload.Ez = z_encoder.E0;
+  eventTrigger(&eventTrigger_error_event);
 }
 
 
