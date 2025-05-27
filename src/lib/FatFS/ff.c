@@ -21,7 +21,7 @@
 
 #include "ff.h"			/* Declarations of FatFs API */
 #include "diskio.h"		/* Declarations of device I/O functions */
-
+#include "debug.h"
 
 /*--------------------------------------------------------------------------
 
@@ -1083,6 +1083,8 @@ static FRESULT sync_window (	/* Returns FR_OK or FR_DISK_ERR */
 				if (fs->n_fats == 2) disk_write(fs->pdrv, fs->win, fs->winsect + fs->fsize, 1);	/* Reflect it to 2nd FAT if needed */
 			}
 		} else {
+			DRESULT code = disk_write(fs->pdrv, fs->win, fs->winsect, 1);
+			DEBUG_PRINT("sync_window: %d\n", code);
 			res = FR_DISK_ERR;
 		}
 	}
@@ -1106,6 +1108,7 @@ static FRESULT move_window (	/* Returns FR_OK or FR_DISK_ERR */
 		if (res == FR_OK) {			/* Fill sector window with new data */
 			if (disk_read(fs->pdrv, fs->win, sect, 1) != RES_OK) {
 				sect = (LBA_t)0 - 1;	/* Invalidate window if read data is not valid */
+				DEBUG_PRINT("move_window\n");
 				res = FR_DISK_ERR;
 			}
 			fs->winsect = sect;
@@ -1144,7 +1147,10 @@ static FRESULT sync_fs (	/* Returns FR_OK or FR_DISK_ERR */
 			fs->fsi_flag = 0;
 		}
 		/* Make sure that no pending write process in the lower layer */
-		if (disk_ioctl(fs->pdrv, CTRL_SYNC, 0) != RES_OK) res = FR_DISK_ERR;
+		if (disk_ioctl(fs->pdrv, CTRL_SYNC, 0) != RES_OK) {
+			DEBUG_PRINT("sync_fs\n");
+			res = FR_DISK_ERR;
+		}
 	}
 
 	return res;
@@ -1472,7 +1478,10 @@ static FRESULT remove_chain (	/* FR_OK(0):succeeded, !=0:error */
 		nxt = get_fat(obj, clst);			/* Get cluster status */
 		if (nxt == 0) break;				/* Empty cluster? */
 		if (nxt == 1) return FR_INT_ERR;	/* Internal error? */
-		if (nxt == 0xFFFFFFFF) return FR_DISK_ERR;	/* Disk error? */
+		if (nxt == 0xFFFFFFFF) {
+			DEBUG_PRINT("remove_chain\n");
+			return FR_DISK_ERR;	/* Disk error? */
+		}
 		if (!FF_FS_EXFAT || fs->fs_type != FS_EXFAT) {
 			res = put_fat(fs, clst, 0);		/* Mark the cluster 'free' on the FAT */
 			if (res != FR_OK) return res;
@@ -1681,7 +1690,10 @@ static FRESULT dir_clear (	/* Returns FR_OK or FR_DISK_ERR */
 	BYTE *ibuf;
 
 
-	if (sync_window(fs) != FR_OK) return FR_DISK_ERR;	/* Flush disk access window */
+	if (sync_window(fs) != FR_OK) {
+		DEBUG_PRINT("dir_clear\n");
+		return FR_DISK_ERR;	/* Flush disk access window */
+	}
 	sect = clst2sect(fs, clst);		/* Top of the cluster */
 	fs->winsect = sect;				/* Set window to top of the cluster */
 	mem_set(fs->win, 0, sizeof fs->win);	/* Clear window buffer */

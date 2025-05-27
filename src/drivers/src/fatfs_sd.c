@@ -14,6 +14,7 @@
 #include "ff.h"
 #include "diskio.h"
 #include "fatfs_sd.h"
+#include "debug.h"
 
 /* MMC card type flags (MMC_GET_TYPE) */
 #define CT_MMC 0x01              /* MMC ver 3 */
@@ -407,16 +408,19 @@ DRESULT SD_disk_write(const BYTE *buff, DWORD sector, UINT count, void * usrOps)
   sdSpiContext_t *context = (sdSpiContext_t *)usrOps;
 
   if (!usrOps || !count) {
+    DEBUG_PRINT("SD_disk_write 1\n");
     return RES_PARERR;
   }
 
   // Check drive status
   if (context->stat & STA_NOINIT) {
+    DEBUG_PRINT("SD_disk_write 2\n");
     return RES_NOTRDY;
   }
 
   // Check write protect
   if (context->stat & STA_PROTECT) {
+    DEBUG_PRINT("SD_disk_write 3\n");
     return RES_WRPRT;
   }
 
@@ -457,7 +461,6 @@ DRESULT SD_disk_write(const BYTE *buff, DWORD sector, UINT count, void * usrOps)
 
     deselect(context);
   }
-
   return count ? RES_ERROR : RES_OK;
 }
 
