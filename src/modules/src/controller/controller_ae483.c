@@ -61,7 +61,7 @@ static float actuatorThrust;
 static encoder_t x_encoder = {0.0f, 0.0f, 1.0f, 1.01f, 15, false, 0};
 static encoder_t y_encoder = {0.0f, 0.0f, 1.0f, 1.01f, 15, false, 0};
 static encoder_t z_encoder = {0.0f, 0.0f, 1.0f, 1.01f, 15, false, 0};
-
+static uint8_t prev_token = 255;
 
 void ae483UpdateWithTOF(tofMeasurement_t *tof)
 {
@@ -177,6 +177,16 @@ void ae483UpdateWithData(const struct AE483Data* data)
   //  data->z         float
   //
   // Exactly what "x", "y", and "z" mean in this context is up to you.
+
+  // Parse through message and read the idempotency token
+  // If this is equal to the previously received token, ignore this message
+  // else, you need to process the code word
+  if(data->idem_token == prev_token)
+  {
+    return;
+  }
+
+
   eventTrigger_code_event_payload.qkx = data->qk_x;
   eventTrigger_code_event_payload.qky = data->qk_y;
   eventTrigger_code_event_payload.qkz = data->qk_z;
@@ -207,6 +217,8 @@ void ae483UpdateWithData(const struct AE483Data* data)
   eventTrigger_error_event_payload.Ey = y_encoder.E0;
   eventTrigger_error_event_payload.Ez = z_encoder.E0;
   eventTrigger(&eventTrigger_error_event);
+
+  prev_token = data->idem_token;
 }
 
 

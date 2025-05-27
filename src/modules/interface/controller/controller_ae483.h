@@ -24,6 +24,9 @@ typedef struct {
 struct AE483Data
 {
   
+  // Idempotency token
+  uint8_t idem_token;
+  
   // Encoded state measurement for x-position
   uint8_t qk_x;
 
