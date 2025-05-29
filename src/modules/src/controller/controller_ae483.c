@@ -17,7 +17,8 @@
 EVENTTRIGGER(error_event, float, Ex, float, Ey, float, Ez)
 EVENTTRIGGER(pos_event, float, px, float, py, float, pz)
 EVENTTRIGGER(vel_event, float, vx, float, vy, float, vz)
-EVENTTRIGGER(code_event, uint8, qkx, uint8, qky, uint8, qkz, uint8, test_var1, uint8, test_var2, uint8, test_var3)
+EVENTTRIGGER(code_event, uint8, qkx, uint8, qky, uint8, qkz)
+EVENTTRIGGER(test_event, uint8, test_var1, uint8, test_var2, uint8, test_var3)
 
 #define DEBUG_MODULE "CONTROLLER AE483"
 #define ATTITUDE_UPDATE_DT    (float)(1.0f/ATTITUDE_RATE)
@@ -190,9 +191,10 @@ void ae483UpdateWithData(const struct AE483Data* data)
   eventTrigger_code_event_payload.qkx = data->qk_x;
   eventTrigger_code_event_payload.qky = data->qk_y;
   eventTrigger_code_event_payload.qkz = data->qk_z;
-  eventTrigger_code_event_payload.test_var1 = data->test_var1;
-  eventTrigger_code_event_payload.test_var2 = data->test_var2;
-  eventTrigger_code_event_payload.test_var3 = data->test_var3;
+  eventTrigger_test_event_payload.test_var1 = data->test_var1;
+  eventTrigger_test_event_payload.test_var2 = data->test_var2;
+  eventTrigger_test_event_payload.test_var3 = data->test_var3;
+  eventTrigger(&eventTrigger_test_event);
   eventTrigger(&eventTrigger_code_event);
 
   eventTrigger_pos_event_payload.px = x_encoder.p_hat;
