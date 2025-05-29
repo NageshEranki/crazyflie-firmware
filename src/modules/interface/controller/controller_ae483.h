@@ -36,6 +36,10 @@ struct AE483Data
   // Encoded state measurement for z-position
   uint8_t qk_z;
 
+  uint8_t test_var1;
+  uint8_t test_var2;
+  uint8_t test_var3;
+
 } __attribute__((packed));
 
 void controllerAE483Init(void);
