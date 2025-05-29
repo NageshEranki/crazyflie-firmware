@@ -24,6 +24,8 @@ EVENTTRIGGER(test_event, uint8, test_var1, uint8, test_var2, uint8, test_var3)
 #define ATTITUDE_UPDATE_DT    (float)(1.0f/ATTITUDE_RATE)
 
 
+static const int DroneID = 1;
+
 
 // Pitch and roll saturation limits (deg)
 static const float rLimit = 20.0f;
@@ -187,10 +189,30 @@ void ae483UpdateWithData(const struct AE483Data* data)
     return;
   }
 
+  uint8_t my_x;
+  uint8_t my_y;
+  uint8_t my_z;
 
-  eventTrigger_code_event_payload.qkx = data->qk_x;
-  eventTrigger_code_event_payload.qky = data->qk_y;
-  eventTrigger_code_event_payload.qkz = data->qk_z;
+  switch (DroneID) {
+    case 1:
+      my_x = data->qk_x1;
+      my_y = data->qk_y1;
+      my_z = data->qk_z1;
+      break;
+    case 2:
+      my_x = data->qk_x2;
+      my_y = data->qk_y2;
+      my_z = data->qk_z2;
+      break;
+    default:
+      my_x = data->qk_x1;
+      my_y = data->qk_y1;
+      my_z = data->qk_z1;
+  }
+
+  eventTrigger_code_event_payload.qkx = my_x;
+  eventTrigger_code_event_payload.qky = my_y;
+  eventTrigger_code_event_payload.qkz = my_z;
   eventTrigger_test_event_payload.test_var1 = data->test_var1;
   eventTrigger_test_event_payload.test_var2 = data->test_var2;
   eventTrigger_test_event_payload.test_var3 = data->test_var3;
@@ -208,9 +230,9 @@ void ae483UpdateWithData(const struct AE483Data* data)
   eventTrigger(&eventTrigger_vel_event);
 
   // Iterate decoders
-  decoder(data->qk_x, &x_encoder);
-  decoder(data->qk_y, &y_encoder);
-  decoder(data->qk_z, &z_encoder);
+  decoder(my_x, &x_encoder);
+  decoder(my_y, &y_encoder);
+  decoder(my_z, &z_encoder);
 
   //  Update the size of the bounding box.
   // 'updateBoundingBox' modifies the 'E0' member variable

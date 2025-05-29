@@ -28,17 +28,17 @@ struct AE483Data
   uint8_t idem_token;
   
   // Encoded state measurement for x-position
-  uint8_t qk_x;
+  uint8_t qk_x1;
 
   // Encoded state measurement for y-position
-  uint8_t qk_y;
+  uint8_t qk_y1;
 
   // Encoded state measurement for z-position
-  uint8_t qk_z;
+  uint8_t qk_z1;
 
-  uint8_t test_var1;
-  uint8_t test_var2;
-  uint8_t test_var3;
+  uint8_t qk_x2;
+  uint8_t qk_y2;
+  uint8_t qk_z2;
 
 } __attribute__((packed));
 
