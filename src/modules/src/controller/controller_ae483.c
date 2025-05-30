@@ -24,8 +24,6 @@ EVENTTRIGGER(code_event, uint8, qkx, uint8, qky, uint8, qkz)
 #define ATTITUDE_UPDATE_DT    (float)(1.0f/ATTITUDE_RATE)
 
 
-static const int DroneID = 1;
-
 
 // Pitch and roll saturation limits (deg)
 static const float rLimit = 20.0f;

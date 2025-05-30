@@ -34,8 +34,8 @@ struct AE483Data
   // Idempotency token
   uint8_t idem_token;
   
-  // Encoded state measurement for 10 drones
-  encoded_drone_data_t encoded_drone_data[10];
+  // Encoded state measurement for 9 drones
+  encoded_drone_data_t encoded_drone_data[9];
 
 } __attribute__((packed));
 
