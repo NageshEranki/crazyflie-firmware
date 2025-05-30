@@ -20,6 +20,13 @@ typedef struct {
 
 } encoder_t;
 
+typedef struct encoded_drone_data_t
+{
+  uint8_t qk_x;
+  uint8_t qk_y;
+  uint8_t qk_z;
+} encoded_drone_data_t; // 3 bytes
+
 // An example struct to hold AE483-specific data sent from client to drone
 struct AE483Data
 {
@@ -27,18 +34,8 @@ struct AE483Data
   // Idempotency token
   uint8_t idem_token;
   
-  // Encoded state measurement for x-position
-  uint8_t qk_x1;
-
-  // Encoded state measurement for y-position
-  uint8_t qk_y1;
-
-  // Encoded state measurement for z-position
-  uint8_t qk_z1;
-
-  uint8_t qk_x2;
-  uint8_t qk_y2;
-  uint8_t qk_z2;
+  // Encoded state measurement for 10 drones
+  encoded_drone_data_t encoded_drone_data[10];
 
 } __attribute__((packed));
 
