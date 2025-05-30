@@ -58,6 +58,7 @@ static attitude_t rateDesired;
 static float actuatorThrust;
 
 // Init encoder objects
+static const unsigned int droneID = 1;
 static encoder_t x_encoder = {0.0f, 0.0f, 1.0f, 1.01f, 15, false, 0};
 static encoder_t y_encoder = {0.0f, 0.0f, 1.0f, 1.01f, 15, false, 0};
 static encoder_t z_encoder = {0.0f, 0.0f, 1.0f, 1.01f, 15, false, 0};
@@ -186,10 +187,14 @@ void ae483UpdateWithData(const struct AE483Data* data)
     return;
   }
 
+  uint8_t qk_x, qk_y, qk_z;
+  qk_x = data->encoded_drone_data[droneID-1].qk_x;
+  qk_y = data->encoded_drone_data[droneID-1].qk_y;
+  qk_z = data->encoded_drone_data[droneID-1].qk_z;
 
-  eventTrigger_code_event_payload.qkx = data->qk_x;
-  eventTrigger_code_event_payload.qky = data->qk_y;
-  eventTrigger_code_event_payload.qkz = data->qk_z;
+  eventTrigger_code_event_payload.qkx = qk_x;
+  eventTrigger_code_event_payload.qky = qk_y;
+  eventTrigger_code_event_payload.qkz = qk_z;
   eventTrigger(&eventTrigger_code_event);
 
   eventTrigger_pos_event_payload.px = x_encoder.p_hat;
@@ -203,9 +208,9 @@ void ae483UpdateWithData(const struct AE483Data* data)
   eventTrigger(&eventTrigger_vel_event);
 
   // Iterate decoders
-  decoder(data->qk_x, &x_encoder);
-  decoder(data->qk_y, &y_encoder);
-  decoder(data->qk_z, &z_encoder);
+  decoder(qk_x, &x_encoder);
+  decoder(qk_y, &y_encoder);
+  decoder(qk_z, &z_encoder);
 
   //  Update the size of the bounding box.
   // 'updateBoundingBox' modifies the 'E0' member variable
