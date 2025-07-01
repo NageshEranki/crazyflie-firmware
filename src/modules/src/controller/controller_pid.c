@@ -1,5 +1,6 @@
 
 #include "stabilizer_types.h"
+#include "power_distribution.h"
 
 #include "attitude_controller.h"
 #include "position_controller.h"
@@ -102,6 +103,11 @@ void controllerPid(control_t *control, const setpoint_t *setpoint,
     if (setpoint->mode.x == modeDisable || setpoint->mode.y == modeDisable) {
       attitudeDesired.roll = setpoint->attitude.roll;
       attitudeDesired.pitch = setpoint->attitude.pitch;
+
+      // TODO: Try the following sometime
+      // When switching to attitude control, you MUST prioritize pitch and roll torque
+      // commands over the collective thrust and yaw-torque.
+      // use_tilt_priority = true;
     }
 
     attitudeControllerCorrectAttitudePID(state->attitude.roll, state->attitude.pitch, state->attitude.yaw,

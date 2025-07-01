@@ -47,7 +47,7 @@
 #  define DEFAULT_IDLE_THRUST CONFIG_MOTORS_DEFAULT_IDLE_THRUST
 #endif
 
-static const bool use_tilt_priority = false;
+bool use_tilt_priority = false;
 static uint32_t idleThrust = DEFAULT_IDLE_THRUST;
 static float armLength = ARM_LENGTH; // m
 static float thrustToTorque = 0.005964552f;

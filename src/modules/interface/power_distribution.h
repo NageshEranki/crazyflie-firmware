@@ -28,6 +28,8 @@
 
 #include "stabilizer_types.h"
 
+extern bool use_tilt_priority;
+
 void powerDistributionInit(void);
 bool powerDistributionTest(void);
 
