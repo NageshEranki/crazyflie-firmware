@@ -28,6 +28,7 @@
 #include "power_distribution.h"
 
 #include <string.h>
+#include <math.h>
 #include "debug.h"
 #include "log.h"
 #include "param.h"
@@ -46,6 +47,7 @@
 #  define DEFAULT_IDLE_THRUST CONFIG_MOTORS_DEFAULT_IDLE_THRUST
 #endif
 
+static const bool use_tilt_priority = false;
 static uint32_t idleThrust = DEFAULT_IDLE_THRUST;
 static float armLength = ARM_LENGTH; // m
 static float thrustToTorque = 0.005964552f;
@@ -87,6 +89,74 @@ static uint16_t capMinThrust(float thrust, uint32_t minThrust) {
   }
 
   return thrust;
+}
+
+static void powerDistributionBrescianini(const control_t *control, motors_thrust_uncapped_t* motorThrustUncapped)
+{
+  int16_t rollAdjusted = control->roll;
+  int16_t pitchAdjusted = control->pitch;
+
+  if(rollAdjusted < -UINT16_MAX/4)
+  {
+    rollAdjusted = -UINT16_MAX/4;
+  }else if(rollAdjusted > UINT16_MAX/4)
+  {
+    rollAdjusted = UINT16_MAX/4;
+  }
+  if(pitchAdjusted < -UINT16_MAX/4)
+  {
+    pitchAdjusted = -UINT16_MAX/4;
+  }else if(pitchAdjusted > UINT16_MAX/4)
+  {
+    pitchAdjusted = UINT16_MAX/4;
+  }
+
+  float thrustAdjusted = control->thrust;
+  float thrustLowerBound = fabsf(pitchAdjusted) + fabsf(rollAdjusted);
+  float thrustUpperBound = UINT16_MAX - fabsf(rollAdjusted) - fabsf(pitchAdjusted);
+  if(thrustAdjusted < thrustLowerBound)
+  {
+    thrustAdjusted = thrustLowerBound;
+  }else if(thrustAdjusted > thrustUpperBound)
+  {
+    thrustAdjusted = thrustUpperBound;
+  }
+
+  float min1 = rollAdjusted - pitchAdjusted - thrustAdjusted;
+  float min2 = thrustAdjusted - rollAdjusted - pitchAdjusted - UINT16_MAX;
+  float min3 = -thrustAdjusted - rollAdjusted + pitchAdjusted;
+  float min4 = thrustAdjusted + rollAdjusted + pitchAdjusted - UINT16_MAX;
+
+  float max1 = UINT16_MAX - thrustAdjusted + rollAdjusted - pitchAdjusted;
+  float max2 = thrustAdjusted - rollAdjusted - pitchAdjusted;
+  float max3 = UINT16_MAX - thrustAdjusted - rollAdjusted + pitchAdjusted;
+  float max4 = thrustAdjusted + rollAdjusted + pitchAdjusted;
+
+  // Find the maximum value among min1, min2, min3, min4
+  float yawMin = min1;
+  if (min2 > yawMin) yawMin = min2;
+  if (min3 > yawMin) yawMin = min3;
+  if (min4 > yawMin) yawMin = min4;
+
+  float yawMax = max1;
+  if (max2 < yawMax) yawMax = max2;
+  if (max3 < yawMax) yawMax = max3;
+  if (max4 < yawMax) yawMax = max4;
+
+  int16_t yawAdjusted = control->yaw;
+
+  if(yawAdjusted < yawMin)
+  {
+    yawAdjusted = yawMin;
+  }else if(yawAdjusted > yawMax)
+  {
+    yawAdjusted = yawMax;
+  }
+
+  motorThrustUncapped->motors.m1 = thrustAdjusted - rollAdjusted + pitchAdjusted + yawAdjusted;
+  motorThrustUncapped->motors.m2 = thrustAdjusted - rollAdjusted - pitchAdjusted - yawAdjusted;
+  motorThrustUncapped->motors.m3 = thrustAdjusted + rollAdjusted - pitchAdjusted + yawAdjusted;
+  motorThrustUncapped->motors.m4 = thrustAdjusted + rollAdjusted + pitchAdjusted - yawAdjusted;
 }
 
 static void powerDistributionLegacy(const control_t *control, motors_thrust_uncapped_t* motorThrustUncapped)
@@ -133,7 +203,13 @@ void powerDistribution(const control_t *control, motors_thrust_uncapped_t* motor
 {
   switch (control->controlMode) {
     case controlModeLegacy:
-      powerDistributionLegacy(control, motorThrustUncapped);
+      if(use_tilt_priority)
+      {
+        powerDistributionBrescianini(control, motorThrustUncapped);
+      } else
+      {
+        powerDistributionLegacy(control, motorThrustUncapped);
+      }
       break;
     case controlModeForceTorque:
       powerDistributionForceTorque(control, motorThrustUncapped);
