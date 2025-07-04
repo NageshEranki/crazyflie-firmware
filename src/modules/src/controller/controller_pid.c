@@ -226,6 +226,7 @@ void controllerPid(control_t *control, const setpoint_t *setpoint,
 
     }else
     {
+      use_tilt_priority = false;
       // Reset if switching back to stock controller
       if (isUsingFreefallController) {
           attitudeControllerResetAllPID(state->attitude.roll, state->attitude.pitch, state->attitude.yaw);
