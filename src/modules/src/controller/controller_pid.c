@@ -1,16 +1,22 @@
 
+#include "platform_defaults.h"
 #include "stabilizer_types.h"
 #include "power_distribution.h"
 
 #include "attitude_controller.h"
 #include "position_controller.h"
 #include "controller_pid.h"
+#include "pid.h"
 
 #include "log.h"
 #include "param.h"
 #include "math3d.h"
 
 #define ATTITUDE_UPDATE_DT    (float)(1.0f/ATTITUDE_RATE)
+#define PITCH_KP              150.0
+#define PITCH_KD              0.1
+#define ROLL_KP               150.0
+#define ROLL_KD               0.1
 
 static attitude_t attitudeDesired;
 static attitude_t rateDesired;
@@ -25,9 +31,53 @@ static float r_pitch;
 static float r_yaw;
 static float accelz;
 
+
+// Variables for the second attitude controller
+// To be used for manual or free-fall flight
+static bool isUsingFreefallController = false;
+static PidObject pidFreeFallRoll = {
+  .kp =  ROLL_KP,
+  .ki = 0.0f,
+  .kd = ROLL_KD,
+  .kff = 0.0f,
+  .outputLimit = UINT16_MAX/4
+};
+
+static PidObject pidFreeFallPitch = {
+  .kp =  PITCH_KP,
+  .ki = 0.0f,
+  .kd = PITCH_KD,
+  .kff = 0.0f,
+  .outputLimit = UINT16_MAX/4
+};
+
+static PidObject pidFreeFallYaw = {
+  .kp =  125.0f,
+  .ki = 0.0f,
+  .kd = 0.1f,
+  .kff = 0.0f,
+};
+
+static void freefallControllerInit(const float updateDt)
+{
+  pidInit(&pidFreeFallRoll, 0, pidFreeFallRoll.kp, pidFreeFallRoll.ki, pidFreeFallRoll.kd, pidFreeFallRoll.kff, 
+        ATTITUDE_UPDATE_DT, ATTITUDE_RATE, ATTITUDE_ROLL_RATE_LPF_CUTOFF_FREQ, true);
+
+
+  pidInit(&pidFreeFallPitch, 0, pidFreeFallPitch.kp, pidFreeFallPitch.ki, pidFreeFallPitch.kd, pidFreeFallPitch.kff, 
+        ATTITUDE_UPDATE_DT, ATTITUDE_RATE, ATTITUDE_PITCH_RATE_LPF_CUTOFF_FREQ, true);
+
+
+  pidInit(&pidFreeFallYaw, 0, pidFreeFallYaw.kp, pidFreeFallYaw.ki, pidFreeFallYaw.kd, pidFreeFallYaw.kff,
+        ATTITUDE_UPDATE_DT, ATTITUDE_RATE, ATTITUDE_YAW_RATE_LPF_CUTOFF_FREQ, true);          
+
+
+}
+
 void controllerPidInit(void)
 {
   attitudeControllerInit(ATTITUDE_UPDATE_DT);
+  freefallControllerInit(ATTITUDE_UPDATE_DT);
   positionControllerInit();
 }
 
@@ -52,6 +102,28 @@ static float capAngle(float angle) {
   }
 
   return result;
+}
+
+void freefallResetAttitudeController(const float rollActual, const float pitchActual, const float yawActual)
+{
+  pidReset(&pidFreeFallRoll,  rollActual);
+  pidReset(&pidFreeFallPitch, pitchActual);
+  pidReset(&pidFreeFallYaw,   yawActual);
+}
+
+void freefallAttitudeController(const float rollActual, const float pitchActual, const float yawActual,
+                                const float rollDes, const float pitchDes, const float yawDes,
+                                control_t* control)
+{
+  pidSetDesired(&pidFreeFallRoll,   rollDes);
+  pidSetDesired(&pidFreeFallPitch,  pitchDes);
+  pidSetDesired(&pidFreeFallYaw,    yawDes);
+
+  control->roll =   pidUpdate(&pidFreeFallRoll,   rollActual,   false);
+  control->pitch =  pidUpdate(&pidFreeFallPitch,  pitchActual,  false);
+  control->yaw =    pidUpdate(&pidFreeFallYaw,    yawActual,    true);
+  
+  // control->thrust is set before this function is called
 }
 
 void controllerPid(control_t *control, const setpoint_t *setpoint,
@@ -104,10 +176,6 @@ void controllerPid(control_t *control, const setpoint_t *setpoint,
       attitudeDesired.roll = setpoint->attitude.roll;
       attitudeDesired.pitch = setpoint->attitude.pitch;
 
-      // TODO: Try the following sometime
-      // When switching to attitude control, you MUST prioritize pitch and roll torque
-      // commands over the collective thrust and yaw-torque.
-      // use_tilt_priority = true;
     }
 
     attitudeControllerCorrectAttitudePID(state->attitude.roll, state->attitude.pitch, state->attitude.yaw,
@@ -133,6 +201,38 @@ void controllerPid(control_t *control, const setpoint_t *setpoint,
     attitudeControllerGetActuatorOutput(&control->roll,
                                         &control->pitch,
                                         &control->yaw);
+
+    // TODO: If the operator wants manual control of RPYT, you MUST
+    // override the stock attitude and attitude-rate PID control inputs
+    // AND you may want to use tilt-prioritzied control allocation
+    if (setpoint->mode.x == modeDisable || setpoint->mode.y == modeDisable)
+    {
+      // TODO: Try the following sometime
+      // When switching to attitude control, you MUST prioritize pitch and roll torque
+      // commands over the collective thrust and yaw-torque.
+      use_tilt_priority = true;
+
+      // Reset if switching to second attitude control in this iteration
+      if(!isUsingFreefallController)
+      {
+        freefallResetAttitudeController(state->attitude.roll, state->attitude.pitch, state->attitude.yaw);
+        isUsingFreefallController = true;
+      }
+      
+      freefallAttitudeController(
+        state->attitude.roll, state->attitude.pitch, state->attitude.yaw,
+        setpoint->attitude.roll, setpoint->attitude.pitch, setpoint->attitude.yaw,
+        control);
+
+    }else
+    {
+      // Reset if switching back to stock controller
+      if (isUsingFreefallController) {
+          attitudeControllerResetAllPID(state->attitude.roll, state->attitude.pitch, state->attitude.yaw);
+          positionControllerResetAllPID(state->position.x, state->position.y, state->position.z);
+          isUsingFreefallController = false;
+      }
+    }                                        
 
     control->yaw = -control->yaw;
 
@@ -234,3 +334,21 @@ LOG_ADD(LOG_FLOAT, pitchRate, &rateDesired.pitch)
  */
 LOG_ADD(LOG_FLOAT, yawRate,   &rateDesired.yaw)
 LOG_GROUP_STOP(controller)
+
+LOG_GROUP_START(pid_freefall)
+/**
+ * @brief Proportional output roll
+ */
+LOG_ADD(LOG_FLOAT, pitch_outP, &pidFreeFallPitch.outP)
+/**
+ * @brief Derivative output roll
+ */
+LOG_ADD(LOG_FLOAT, pitch_outD, &pidFreeFallPitch.outD)
+LOG_GROUP_STOP(pid_freefall)
+
+PARAM_GROUP_START(pid2Param)
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT,  pitchKp, &pidFreeFallPitch.kp)
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT,  pitchKd, &pidFreeFallPitch.kd)
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT,  rollKp, &pidFreeFallRoll.kp)
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT,  rollKd, &pidFreeFallRoll.kd)
+PARAM_GROUP_STOP(pid2Param)
