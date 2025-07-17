@@ -14,9 +14,9 @@
 
 #define ATTITUDE_UPDATE_DT    (float)(1.0f/ATTITUDE_RATE)
 #define PITCH_KP              150.0
-#define PITCH_KD              0.1
+#define PITCH_KD              90.0
 #define ROLL_KP               150.0
-#define ROLL_KD               0.1
+#define ROLL_KD               90.0
 
 static attitude_t attitudeDesired;
 static attitude_t rateDesired;
