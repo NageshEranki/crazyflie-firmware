@@ -30,6 +30,7 @@
  * Academic citation would be appreciated.
  *
  * BIBTEX ENTRIES:
+ * \verbatim
       @INPROCEEDINGS{MuellerHamerUWB2015,
       author  = {Mueller, Mark W and Hamer, Michael and D’Andrea, Raffaello},
       title   = {Fusing ultra-wideband range measurements with accelerometers and rate gyroscopes for quadrocopter state estimation},
@@ -47,6 +48,7 @@
       pages={1--7},
       year={2016},
       publisher={American Institute of Aeronautics and Astronautics}}
+ * \endverbatim
  *
  * ============================================================================
  *
@@ -74,6 +76,7 @@
 #include "physicalConstants.h"
 #include "supervisor.h"
 #include "axis3fSubSampler.h"
+#include "deck.h"
 
 #include "statsCnt.h"
 #include "rateSupervisor.h"
@@ -191,6 +194,8 @@ STATIC_MEM_TASK_ALLOC_STACK_NO_DMA_CCM_SAFE(kalmanTask, KALMAN_TASK_STACKSIZE);
 // Called one time during system startup
 void estimatorKalmanTaskInit() {
   kalmanCoreDefaultParams(&coreParams);
+  // It would be logical to set the params->attitudeReversion here, based on deck requirements, but the decks are
+  // not initialized yet at this point so it is done in estimatorKalmanInit().
 
   // Created in the 'empty' state, meaning the semaphore must first be given, that is it will block in the task
   // until released by the stabilizer loop
@@ -225,7 +230,11 @@ static void kalmanTask(void* parameters) {
       resetEstimation = false;
     }
 
+    #ifdef CONFIG_ESTIMATOR_KALMAN_GENERAL_PURPOSE
+    bool quadIsFlying = false;
+    #else
     bool quadIsFlying = supervisorIsFlying();
+    #endif
 
   #ifdef KALMAN_DECOUPLE_XY
     kalmanCoreDecoupleXY(&coreData);
@@ -236,7 +245,7 @@ static void kalmanTask(void* parameters) {
       axis3fSubSamplerFinalize(&accSubSampler);
       axis3fSubSamplerFinalize(&gyroSubSampler);
 
-      kalmanCorePredict(&coreData, &accSubSampler.subSample, &gyroSubSampler.subSample, nowMs, quadIsFlying);
+      kalmanCorePredict(&coreData, &coreParams, &accSubSampler.subSample, &gyroSubSampler.subSample, nowMs, quadIsFlying);
       nextPredictionMs = nowMs + PREDICTION_UPDATE_INTERVAL_MS;
 
       STATS_CNT_RATE_EVENT(&predictionCounter);
@@ -365,6 +374,16 @@ static void updateQueuedMeasurements(const uint32_t nowMs, const bool quadIsFlyi
 // Called when this estimator is activated
 void estimatorKalmanInit(void)
 {
+  #ifdef CONFIG_DECK_LOCO_2D_POSITION
+  coreParams.attitudeReversion = 0.0f;
+  #else
+  if (deckGetRequiredKalmanEstimatorAttitudeReversionOff())
+  {
+    coreParams.attitudeReversion = 0.0f;
+    DEBUG_PRINT("Attitude reversion deactivated by deck\n");
+  }
+  #endif
+
   axis3fSubSamplerInit(&accSubSampler, GRAVITY_MAGNITUDE);
   axis3fSubSamplerInit(&gyroSubSampler, DEG_TO_RAD);
 
