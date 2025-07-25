@@ -133,13 +133,16 @@ enum TrajectoryCommand_e {
   COMMAND_TAKEOFF                 = 1, // Deprecated (removed after August 2023), use COMMAND_TAKEOFF_2
   COMMAND_LAND                    = 2, // Deprecated (removed after August 2023), use COMMAND_LAND_2
   COMMAND_STOP                    = 3,
-  COMMAND_GO_TO                   = 4,
-  COMMAND_START_TRAJECTORY        = 5,
+  COMMAND_GO_TO                   = 4, // Deprecated (will be removed), use COMMAND_GO_TO_2
+  COMMAND_START_TRAJECTORY        = 5, // Deprecated, use COMMAND_START_TRAJECTORY_2
   COMMAND_DEFINE_TRAJECTORY       = 6,
   COMMAND_TAKEOFF_2               = 7,
   COMMAND_LAND_2                  = 8,
   COMMAND_TAKEOFF_WITH_VELOCITY   = 9,
   COMMAND_LAND_WITH_VELOCITY      = 10,
+  COMMAND_SPIRAL                  = 11,
+  COMMAND_GO_TO_2                 = 12,
+  COMMAND_START_TRAJECTORY_2      = 13,
 };
 
 struct data_set_group_mask {
@@ -218,10 +221,45 @@ struct data_go_to {
   float duration; // sec
 } __attribute__((packed));
 
+// "take this much time to go here, then hover"
+struct data_go_to_2 {
+  uint8_t groupMask; // mask for which CFs this should apply to
+  uint8_t relative;  // set to true, if position/yaw are relative to current setpoint
+  uint8_t linear;  // set to true for linear interpolation instead of smooth polynomial
+  float x; // m
+  float y; // m
+  float z; // m
+  float yaw; // rad
+  float duration; // sec
+} __attribute__((packed));
+
+// "fly along a spiral"
+struct data_spiral {
+  uint8_t groupMask; // mask for which CFs this should apply to
+  uint8_t sideways;  // set to true, if crazyfly should spiral sideways instead of forward
+  uint8_t clockwise; // set to true, if crazyfly should spiral clockwise instead of counter-clockwise
+  float phi; // rad
+  float r0; // m
+  float rf; // m
+  float dz; // m
+  float duration; // sec
+} __attribute__((packed));
+
 // starts executing a specified trajectory
+// Deprecated, use data_start_trajectory_2 instead
 struct data_start_trajectory {
   uint8_t groupMask; // mask for which CFs this should apply to
   uint8_t relative;  // set to true, if trajectory should be shifted to current setpoint
+  uint8_t reversed;  // set to true, if trajectory should be executed in reverse
+  uint8_t trajectoryId; // id of the trajectory (previously defined by COMMAND_DEFINE_TRAJECTORY)
+  float timescale; // time factor; 1 = original speed; >1: slower; <1: faster
+} __attribute__((packed));
+
+// starts executing a specified trajectory
+struct data_start_trajectory_2 {
+  uint8_t groupMask; // mask for which CFs this should apply to
+  uint8_t relativePosition;  // set to true, if trajectory should be shifted to current position
+  uint8_t relativeYaw; // set to true, if trajectory should be aligned to current yaw
   uint8_t reversed;  // set to true, if trajectory should be executed in reverse
   uint8_t trajectoryId; // id of the trajectory (previously defined by COMMAND_DEFINE_TRAJECTORY)
   float timescale; // time factor; 1 = original speed; >1: slower; <1: faster
@@ -245,7 +283,10 @@ static int takeoff_with_velocity(const struct data_takeoff_with_velocity* data);
 static int land_with_velocity(const struct data_land_with_velocity* data);
 static int stop(const struct data_stop* data);
 static int go_to(const struct data_go_to* data);
+static int go_to2(const struct data_go_to_2* data);
+static int spiral(const struct data_spiral* data);
 static int start_trajectory(const struct data_start_trajectory* data);
+static int start_trajectory2(const struct data_start_trajectory_2* data);
 static int define_trajectory(const struct data_define_trajectory* data);
 
 // Helper functions
@@ -403,8 +444,17 @@ static int handleCommand(const enum TrajectoryCommand_e command, const uint8_t* 
     case COMMAND_GO_TO:
       ret = go_to((const struct data_go_to*)data);
       break;
+    case COMMAND_GO_TO_2:
+      ret = go_to2((const struct data_go_to_2*)data);
+      break;
+    case COMMAND_SPIRAL:
+      ret = spiral((const struct data_spiral*)data);
+      break;
     case COMMAND_START_TRAJECTORY:
       ret = start_trajectory((const struct data_start_trajectory*)data);
+      break;
+    case COMMAND_START_TRAJECTORY_2:
+      ret = start_trajectory2((const struct data_start_trajectory_2*)data);
       break;
     case COMMAND_DEFINE_TRAJECTORY:
       ret = define_trajectory((const struct data_define_trajectory*)data);
@@ -609,16 +659,73 @@ int go_to(const struct data_go_to* data)
       ev.pos = pos;
       ev.vel = vel;
       ev.yaw = yaw;
-      result = plan_go_to_from(&planner, &ev, data->relative, hover_pos, data->yaw, data->duration, t);
+      result = plan_go_to_from(&planner, &ev, data->relative, false, hover_pos, data->yaw, data->duration, t);
     }
     else {
-      result = plan_go_to(&planner, data->relative, hover_pos, data->yaw, data->duration, t);
+      result = plan_go_to(&planner, data->relative, false, hover_pos, data->yaw, data->duration, t);
     }
     xSemaphoreGive(lockTraj);
   }
   return result;
 }
 
+int go_to2(const struct data_go_to_2* data)
+{
+  static struct traj_eval ev = {
+    // pos, vel, yaw will be filled before using
+    .acc = {0.0f, 0.0f, 0.0f},
+    .omega = {0.0f, 0.0f, 0.0f},
+  };
+
+  if (isBlocked) {
+    return EBUSY;
+  }
+
+  int result = 0;
+  if (isInGroup(data->groupMask)) {
+    struct vec hover_pos = mkvec(data->x, data->y, data->z);
+    xSemaphoreTake(lockTraj, portMAX_DELAY);
+    float t = usecTimestamp() / 1e6;
+    if (plan_is_disabled(&planner) || plan_is_stopped(&planner)) {
+      ev.pos = pos;
+      ev.vel = vel;
+      ev.yaw = yaw;
+      result = plan_go_to_from(&planner, &ev, data->relative, data->linear, hover_pos, data->yaw, data->duration, t);
+    }
+    else {
+      result = plan_go_to(&planner, data->relative, data->linear, hover_pos, data->yaw, data->duration, t);
+    }
+    xSemaphoreGive(lockTraj);
+  }
+  return result;
+}
+
+int spiral(const struct data_spiral* data)
+{
+  static struct traj_eval ev = {
+    // pos, vel, yaw will be filled before using
+    .acc = {0.0f, 0.0f, 0.0f},
+    .omega = {0.0f, 0.0f, 0.0f},
+  };
+
+  if (isBlocked) {
+    return EBUSY;
+  }
+
+  int result = 0;
+  if (isInGroup(data->groupMask)) {
+    xSemaphoreTake(lockTraj, portMAX_DELAY);
+    float t = usecTimestamp() / 1e6;
+    ev.pos = pos;
+    ev.vel = vel;
+    ev.yaw = yaw;
+    result = plan_spiral_from(&planner, &ev, data->sideways, data->clockwise, data->phi, data->r0, data->rf, data->dz, data->duration, t);
+    xSemaphoreGive(lockTraj);
+  }
+  return result;
+}
+
+// Deprecated
 int start_trajectory(const struct data_start_trajectory* data)
 {
   if (isBlocked) {
@@ -637,7 +744,7 @@ int start_trajectory(const struct data_start_trajectory* data)
         trajectory.timescale = data->timescale;
         trajectory.n_pieces = trajDesc->trajectoryIdentifier.mem.n_pieces;
         trajectory.pieces = (struct poly4d*)&trajectories_memory[trajDesc->trajectoryIdentifier.mem.offset];
-        result = plan_start_trajectory(&planner, &trajectory, data->reversed, data->relative, pos);
+        result = plan_start_trajectory(&planner, &trajectory, data->reversed, data->relative, false, pos, yaw);
         xSemaphoreGive(lockTraj);
       } else if (trajDesc->trajectoryLocation == TRAJECTORY_LOCATION_MEM
           && trajDesc->trajectoryType == CRTP_CHL_TRAJECTORY_TYPE_POLY4D_COMPRESSED) {
@@ -653,6 +760,48 @@ int start_trajectory(const struct data_start_trajectory* data)
           );
           compressed_trajectory.t_begin = t;
           result = plan_start_compressed_trajectory(&planner, &compressed_trajectory, data->relative, pos);
+          xSemaphoreGive(lockTraj);
+        }
+      }
+    }
+  }
+  return result;
+}
+
+int start_trajectory2(const struct data_start_trajectory_2* data)
+{
+  if (isBlocked) {
+    return EBUSY;
+  }
+
+  int result = 0;
+  if (isInGroup(data->groupMask)) {
+    if (data->trajectoryId < NUM_TRAJECTORY_DEFINITIONS) {
+      struct trajectoryDescription* trajDesc = &trajectory_descriptions[data->trajectoryId];
+      if (   trajDesc->trajectoryLocation == TRAJECTORY_LOCATION_MEM
+          && trajDesc->trajectoryType == CRTP_CHL_TRAJECTORY_TYPE_POLY4D) {
+        xSemaphoreTake(lockTraj, portMAX_DELAY);
+        float t = usecTimestamp() / 1e6;
+        trajectory.t_begin = t;
+        trajectory.timescale = data->timescale;
+        trajectory.n_pieces = trajDesc->trajectoryIdentifier.mem.n_pieces;
+        trajectory.pieces = (struct poly4d*)&trajectories_memory[trajDesc->trajectoryIdentifier.mem.offset];
+        result = plan_start_trajectory(&planner, &trajectory, data->reversed, data->relativePosition, data->relativeYaw, pos, yaw);
+        xSemaphoreGive(lockTraj);
+      } else if (trajDesc->trajectoryLocation == TRAJECTORY_LOCATION_MEM
+          && trajDesc->trajectoryType == CRTP_CHL_TRAJECTORY_TYPE_POLY4D_COMPRESSED) {
+
+        if (data->timescale != 1 || data->reversed) {
+          result = ENOEXEC;
+        } else {
+          xSemaphoreTake(lockTraj, portMAX_DELAY);
+          float t = usecTimestamp() / 1e6;
+          piecewise_compressed_load(
+            &compressed_trajectory,
+            &trajectories_memory[trajDesc->trajectoryIdentifier.mem.offset]
+          );
+          compressed_trajectory.t_begin = t;
+          result = plan_start_compressed_trajectory(&planner, &compressed_trajectory, data->relativePosition, pos);
           xSemaphoreGive(lockTraj);
         }
       }
@@ -820,6 +969,39 @@ int crtpCommanderHighLevelGoTo(const float x, const float y, const float z, cons
   return handleCommand(COMMAND_GO_TO, (const uint8_t*)&data);
 }
 
+int crtpCommanderHighLevelGoTo2(const float x, const float y, const float z, const float yaw, const float duration_s, const bool relative, const bool linear)
+{
+  struct data_go_to_2 data =
+  {
+    .x = x,
+    .y = y,
+    .z = z,
+    .yaw = yaw,
+    .duration = duration_s,
+    .relative = relative,
+    .linear = linear,
+    .groupMask = ALL_GROUPS,
+  };
+
+  return handleCommand(COMMAND_GO_TO_2, (const uint8_t*)&data);
+}
+
+int crtpCommanderHighLevelSpiral(const float phi, const float r0, const float rf, const float dz, const float duration_s, const bool sideways)
+{
+  struct data_spiral data =
+  {
+    .phi = phi,
+    .r0 = r0,
+    .rf = rf,
+    .dz = dz,
+    .duration = duration_s,
+    .sideways = sideways,
+    .groupMask = ALL_GROUPS,
+  };
+
+  return handleCommand(COMMAND_SPIRAL, (const uint8_t*)&data);
+}
+
 bool crtpCommanderHighLevelIsTrajectoryDefined(uint8_t trajectoryId)
 {
   return (
@@ -828,18 +1010,19 @@ bool crtpCommanderHighLevelIsTrajectoryDefined(uint8_t trajectoryId)
   );
 }
 
-int crtpCommanderHighLevelStartTrajectory(const uint8_t trajectoryId, const float timeScale, const bool relative, const bool reversed)
+int crtpCommanderHighLevelStartTrajectory(const uint8_t trajectoryId, const float timeScale, const bool relativePosition, const bool relativeYaw, const bool reversed)
 {
-  struct data_start_trajectory data =
+  struct data_start_trajectory_2 data =
   {
     .trajectoryId = trajectoryId,
     .timescale = timeScale,
-    .relative = relative,
+    .relativePosition = relativePosition,
+    .relativeYaw = relativeYaw,
     .reversed = reversed,
     .groupMask = ALL_GROUPS,
   };
 
-  return handleCommand(COMMAND_START_TRAJECTORY, (const uint8_t*)&data);
+  return handleCommand(COMMAND_START_TRAJECTORY_2, (const uint8_t*)&data);
 }
 
 int crtpCommanderHighLevelDefineTrajectory(const uint8_t trajectoryId, const crtpCommanderTrajectoryType_t type, const uint32_t offset, const uint8_t nPieces)
@@ -882,6 +1065,11 @@ bool crtpCommanderHighLevelReadTrajectory(const uint32_t offset, const uint32_t 
   }
 
   return result;
+}
+
+
+enum trajectory_state crtpCommanderHighLevelGetPlannerState() {
+  return planner.state;
 }
 
 bool crtpCommanderHighLevelIsTrajectoryFinished() {

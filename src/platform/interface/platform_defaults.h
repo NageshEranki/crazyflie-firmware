@@ -57,6 +57,27 @@
     // kg
     #define CF_MASS     0.027f
 #endif
+#ifndef VMOTOR2THRUST0
+    #define VMOTOR2THRUST0  0.0f
+#endif
+#ifndef VMOTOR2THRUST1
+    #define VMOTOR2THRUST1  0.0f
+#endif
+#ifndef VMOTOR2THRUST2
+    #define VMOTOR2THRUST2  0.0f
+#endif
+#ifndef VMOTOR2THRUST3
+    #define VMOTOR2THRUST3  0.0f
+#endif
+#ifndef THRUST_MIN
+    #define THRUST_MIN      0.02f
+#endif
+#ifndef THRUST_MAX
+    #define THRUST_MAX      0.1125f
+#endif
+#ifndef THRUST2TORQUE
+    #define THRUST2TORQUE   0.005964552f
+#endif
 
 // IMU alignment on the airframe 
 #ifndef IMU_PHI
@@ -120,12 +141,36 @@
     #define PID_VEL_Z_FILT_CUTOFF 20.0f
 #endif
 #ifndef PID_VEL_Z_FILT_CUTOFF_BARO_Z_HOLD
-    #define PID_VEL_Z_FILT_CUTOFF_BARO_Z_HOLD 0.7 f
+    #define PID_VEL_Z_FILT_CUTOFF_BARO_Z_HOLD 0.7f
 #endif
 
-// Tumble detection enabled by default
+// Tumble detection settings
 #ifndef SUPERVISOR_TUMBLE_CHECK_ENABLE
     #define SUPERVISOR_TUMBLE_CHECK_ENABLE true
+#endif
+
+// 60 degrees tilt (when stationary)
+#ifndef SUPERVISOR_TUMBLE_CHECK_ACCEPTED_TILT_ACCZ
+    #define SUPERVISOR_TUMBLE_CHECK_ACCEPTED_TILT_ACCZ 0.5f
+#endif
+
+
+#ifndef SUPERVISOR_TUMBLE_CHECK_ACCEPTED_TILT_TIME
+    #define SUPERVISOR_TUMBLE_CHECK_ACCEPTED_TILT_TIME 1000
+#endif
+
+#ifndef SUPERVISOR_TUMBLE_CHECK_ACCEPTED_UPSIDEDOWN_ACCZ
+    #define SUPERVISOR_TUMBLE_CHECK_ACCEPTED_UPSIDEDOWN_ACCZ -0.2f
+#endif
+
+
+#ifndef SUPERVISOR_TUMBLE_CHECK_ACCEPTED_UPSIDEDOWN_TIME
+    #define SUPERVISOR_TUMBLE_CHECK_ACCEPTED_UPSIDEDOWN_TIME 100
+#endif
+
+// Pre-flight disarming timeout
+#ifndef PREFLIGHT_TIMEOUT_MS
+    #define PREFLIGHT_TIMEOUT_MS 30000
 #endif
 
 // Landing timeout before disarming
@@ -162,3 +207,8 @@
 #endif
 
 
+// This is the threshold for a propeller/motor to pass. It calculates the
+// variance of the accelerometer X+Y when the propeller is spinning.
+#ifndef HEALTH_PROPELLER_TEST_THRESHOLD
+    #define HEALTH_PROPELLER_TEST_THRESHOLD  0.0f
+#endif

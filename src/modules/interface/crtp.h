@@ -30,7 +30,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define CRTP_PROTOCOL_VERSION 7
+#define CRTP_PROTOCOL_VERSION 10
 
 #define CRTP_MAX_DATA_SIZE 30
 
@@ -153,7 +153,7 @@ int crtpGetFreeTxQueuePackets(void);
  * Wait for a packet to arrive for the specified taskID
  *
  * @param[in]  taskId The id of the CRTP task
- * @paran[out] p      The CRTP Packet with information
+ * @param[out] p      The CRTP Packet with information
  *
  * @return status of fetch from queue
  */
