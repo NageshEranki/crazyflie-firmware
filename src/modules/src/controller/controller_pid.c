@@ -338,13 +338,21 @@ LOG_GROUP_STOP(controller)
 
 LOG_GROUP_START(pid_freefall)
 /**
- * @brief Proportional output roll
+ * @brief Proportional output pitch
  */
 LOG_ADD(LOG_FLOAT, pitch_outP, &pidFreeFallPitch.outP)
 /**
- * @brief Derivative output roll
+ * @brief Derivative output pitch
  */
 LOG_ADD(LOG_FLOAT, pitch_outD, &pidFreeFallPitch.outD)
+/**
+ * @brief Proportional output roll
+ */
+LOG_ADD(LOG_FLOAT, roll_outP, &pidFreeFallRoll.outP)
+/**
+ * @brief Derivative output roll
+ */
+LOG_ADD(LOG_FLOAT, roll_outD, &pidFreeFallRoll.outD)
 LOG_GROUP_STOP(pid_freefall)
 
 PARAM_GROUP_START(pid2Param)
