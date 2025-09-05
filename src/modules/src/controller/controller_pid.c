@@ -353,6 +353,14 @@ LOG_ADD(LOG_FLOAT, roll_outP, &pidFreeFallRoll.outP)
  * @brief Derivative output roll
  */
 LOG_ADD(LOG_FLOAT, roll_outD, &pidFreeFallRoll.outD)
+/**
+ * @brief Proportional output yaw
+ */
+LOG_ADD(LOG_FLOAT, yaw_outP, &pidFreeFallYaw.outP)
+/**
+ * @brief Derivative output yaw
+ */
+LOG_ADD(LOG_FLOAT, yaw_outD, &pidFreeFallYaw.outD)
 LOG_GROUP_STOP(pid_freefall)
 
 PARAM_GROUP_START(pid2Param)
