@@ -126,6 +126,7 @@ void crtpCommanderRpytDecodeSetpoint(setpoint_t *setpoint, CRTPPacket *pk)
   }
   if (values->thrust == 0) {
     thrustLocked = false;
+    return;
   }
 
   // Thrust
