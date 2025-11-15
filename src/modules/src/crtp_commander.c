@@ -33,6 +33,15 @@
 #include "crtp.h"
 
 
+//  First, check if the custom flag from my_fsm.h
+//  was defined. If yes, we are building from the
+//  app layer. If not, this build is from the root
+//  folder. (UPDATE) This doe NOT work properly
+// #ifdef  MY_FSM_ENABLED
+// #include "../../examples/app_my_fsm/src/my_fsm.h"
+// #endif
+#include "../../examples/app_my_fsm/src/my_fsm.h"
+
 static bool isInit;
 
 static void commanderCrtpCB(CRTPPacket* pk);
@@ -110,6 +119,16 @@ const static metaCommandDecoder_t metaCommandDecoders[] = {
 /* Decoder switch */
 static void commanderCrtpCB(CRTPPacket* pk)
 {
+
+  // #ifdef MY_FSM_ENABLED
+  // if(state == RECOVER || state == HOLD)
+  //   return; 
+  // #endif
+  //  Monitor the quadrotor state (ref. custom FSM in the app layer)
+  //  If the quadrotor has crashed, you must ignore the RPYT setpoints
+  //  sent over the radio 
+  if(state != NORMAL)
+    return; 
   static setpoint_t setpoint;
 
   if(pk->port == CRTP_PORT_SETPOINT && pk->channel == 0) {
