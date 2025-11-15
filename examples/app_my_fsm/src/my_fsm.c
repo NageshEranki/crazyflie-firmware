@@ -258,7 +258,8 @@ void appMain() {
     vTaskDelay(M2T(10));
 
     pullStates();
-    // acc_z = logGetFloat(idAccZ);
+    
+    memset(&setpoint, 0, sizeof(setpoint_t)); 
 
     switch (state)
     {
