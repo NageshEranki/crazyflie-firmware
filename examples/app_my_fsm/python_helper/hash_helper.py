@@ -6,8 +6,9 @@ import os
 # repository root (the folder with the .git directory).
 # This will be the *only* place you need to set this.
 MY_CODE_FOLDERS_TO_TRACK = [
-    'src/',           # <-- CHANGE THIS: Assumed path to your C code
-    'client_code/'  # <-- CHANGE THIS: Path to your python code
+    'examples/app_my_fsm/src/',           # <-- CHANGE THIS: Assumed path to your C code
+    'examples/app_my_fsm/client_code/',   # <-- CHANGE THIS: Path to your python code
+    'examples/app_my_fsm/python_helper/'
 ]
 # ---------------------------
 
@@ -54,12 +55,13 @@ def get_git_hash(repo_path="."):
         else:
             return f"{git_hash}"
             
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as e:
+        print(e)
         return "unknown"
     except FileNotFoundError:
         return "git-not-found"
 
 if __name__ == "__main__":
 
-    hash_str = get_git_hash("../..")
+    hash_str = get_git_hash('../../..')
     print(hash_str)
