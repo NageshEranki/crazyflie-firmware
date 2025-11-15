@@ -64,3 +64,4 @@ tools/usdlog/log01 11-10-53-838
 
 **/flight_logs/
 **/cache/
+**/__pycache__/
