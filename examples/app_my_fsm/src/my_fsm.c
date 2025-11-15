@@ -216,7 +216,7 @@ void setSlowDownSetpoint(setpoint_t* setpoint)
   setpoint->velocity.y = 0.0f;
 
   setpoint->mode.z = modeAbs;
-  setpoint->position.z = 0.8f;  
+  setpoint->position.z = HOLD_ALTITUDE;  
   
   setpoint->mode.yaw = modeVelocity;
   setpoint->attitudeRate.yaw = 0.0f;
@@ -337,7 +337,7 @@ void appMain() {
       commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP);
       // if(xTaskGetTickCount()-startTickCount >= SLOWDOWN_TIME_SPAN)
       float v_xyz_mag = vmag(mkvec(vx, vy, vz));
-      if(fabsf(v_xyz_mag) < V_XY_THRESHOLD && fabsf(pz-0.8f) < 0.1f)
+      if(fabsf(v_xyz_mag) < V_XY_THRESHOLD && fabsf(pz-HOLD_ALTITUDE) < 0.1f)
       {
         state = HOLD;
         commanderRelaxPriority();

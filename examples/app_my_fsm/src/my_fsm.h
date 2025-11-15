@@ -29,6 +29,7 @@ static const uint16_t THRUST_RECOVER = 42000;
 static const unsigned int RECOVER_TIME_SPAN = 1000;
 static const unsigned int HOLD_TIME_SPAN = 5000;
 static const unsigned int SLOWDOWN_TIME_SPAN = 5000;
+static const float HOLD_ALTITUDE = 0.8f;
 
 //  Define the list of states
 typedef enum
