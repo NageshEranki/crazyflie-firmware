@@ -53,3 +53,11 @@ src/modules/src/controller/math_equations.ipynb
 vendor/CMSIS
 examples/app_appchannel_test/src/appchannel_test.c
 examples/app_appchannel_test/src/appchannel_test.c
+
+aideck_gap8_wifi_img_streamer_with_ap.bin
+diff.txt
+examples/app_broadcast_fixed_point/
+examples/app_broadcast_pos/
+examples/hopcopter_controller/
+tools/usdlog/log00 11-10-46-959
+tools/usdlog/log01 11-10-53-838
