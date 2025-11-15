@@ -7,7 +7,7 @@ import os
 # This will be the *only* place you need to set this.
 MY_CODE_FOLDERS_TO_TRACK = [
     'src/',           # <-- CHANGE THIS: Assumed path to your C code
-    'python_client/'  # <-- CHANGE THIS: Path to your python code
+    'client_code/'  # <-- CHANGE THIS: Path to your python code
 ]
 # ---------------------------
 
@@ -58,3 +58,8 @@ def get_git_hash(repo_path="."):
         return "unknown"
     except FileNotFoundError:
         return "git-not-found"
+
+if __name__ == "__main__":
+
+    hash_str = get_git_hash("../..")
+    print(hash_str)
