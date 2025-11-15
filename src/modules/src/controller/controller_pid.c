@@ -12,6 +12,9 @@
 #include "param.h"
 #include "math3d.h"
 
+// Include FSM header to access state
+#include "../../examples/app_my_fsm/src/my_fsm.h"
+
 #define ATTITUDE_UPDATE_DT    (float)(1.0f/ATTITUDE_RATE)
 #define PITCH_KP              150.0
 #define PITCH_KD              90.0
@@ -128,7 +131,7 @@ void freefallAttitudeController(const float rollActual, const float pitchActual,
 
 void controllerPid(control_t *control, const setpoint_t *setpoint,
                                          const sensorData_t *sensors,
-                                         const state_t *state,
+                                         const state_t *stateEstimate,
                                          const stabilizerStep_t stabilizerStep)
 {
   control->controlMode = controlModeLegacy;
@@ -141,15 +144,15 @@ void controllerPid(control_t *control, const setpoint_t *setpoint,
       float yawMaxDelta = attitudeControllerGetYawMaxDelta();
       if (yawMaxDelta != 0.0f)
       {
-      float delta = capAngle(attitudeDesired.yaw-state->attitude.yaw);
+      float delta = capAngle(attitudeDesired.yaw-stateEstimate->attitude.yaw);
       // keep the yaw setpoint within +/- yawMaxDelta from the current yaw
         if (delta > yawMaxDelta)
         {
-          attitudeDesired.yaw = state->attitude.yaw + yawMaxDelta;
+          attitudeDesired.yaw = stateEstimate->attitude.yaw + yawMaxDelta;
         }
         else if (delta < -yawMaxDelta)
         {
-          attitudeDesired.yaw = state->attitude.yaw - yawMaxDelta;
+          attitudeDesired.yaw = stateEstimate->attitude.yaw - yawMaxDelta;
         }
       }
     } else if (setpoint->mode.yaw == modeAbs) {
@@ -164,7 +167,7 @@ void controllerPid(control_t *control, const setpoint_t *setpoint,
   }
 
   if (RATE_DO_EXECUTE(POSITION_RATE, stabilizerStep)) {
-    positionController(&actuatorThrust, &attitudeDesired, setpoint, state);
+    positionController(&actuatorThrust, &attitudeDesired, setpoint, stateEstimate);
   }
 
   if (RATE_DO_EXECUTE(ATTITUDE_RATE, stabilizerStep)) {
@@ -178,7 +181,7 @@ void controllerPid(control_t *control, const setpoint_t *setpoint,
 
     }
 
-    attitudeControllerCorrectAttitudePID(state->attitude.roll, state->attitude.pitch, state->attitude.yaw,
+    attitudeControllerCorrectAttitudePID(stateEstimate->attitude.roll, stateEstimate->attitude.pitch, stateEstimate->attitude.yaw,
                                 attitudeDesired.roll, attitudeDesired.pitch, attitudeDesired.yaw,
                                 &rateDesired.roll, &rateDesired.pitch, &rateDesired.yaw);
 
@@ -187,11 +190,11 @@ void controllerPid(control_t *control, const setpoint_t *setpoint,
     // behavior if level mode is engaged later
     if (setpoint->mode.roll == modeVelocity) {
       rateDesired.roll = setpoint->attitudeRate.roll;
-      attitudeControllerResetRollAttitudePID(state->attitude.roll);
+      attitudeControllerResetRollAttitudePID(stateEstimate->attitude.roll);
     }
     if (setpoint->mode.pitch == modeVelocity) {
       rateDesired.pitch = setpoint->attitudeRate.pitch;
-      attitudeControllerResetPitchAttitudePID(state->attitude.pitch);
+      attitudeControllerResetPitchAttitudePID(stateEstimate->attitude.pitch);
     }
 
     // TODO: Investigate possibility to subtract gyro drift.
@@ -215,22 +218,24 @@ void controllerPid(control_t *control, const setpoint_t *setpoint,
       // Reset if switching to second attitude control in this iteration
       if(!isUsingFreefallController)
       {
-        freefallResetAttitudeController(state->attitude.roll, state->attitude.pitch, state->attitude.yaw);
+        freefallResetAttitudeController(stateEstimate->attitude.roll, stateEstimate->attitude.pitch, stateEstimate->attitude.yaw);
         isUsingFreefallController = true;
       }
       
       freefallAttitudeController(
-        state->attitude.roll, state->attitude.pitch, state->attitude.yaw,
+        stateEstimate->attitude.roll, stateEstimate->attitude.pitch, stateEstimate->attitude.yaw,
         setpoint->attitude.roll, setpoint->attitude.pitch, setpoint->attitude.yaw,
         control);
 
     }else
     {
-      use_tilt_priority = false;
+      // Enable tilt-priority allocation for SLOWDOWN state
+      use_tilt_priority = (state == SLOWDOWN);
+
       // Reset if switching back to stock controller
       if (isUsingFreefallController) {
-          attitudeControllerResetAllPID(state->attitude.roll, state->attitude.pitch, state->attitude.yaw);
-          positionControllerResetAllPID(state->position.x, state->position.y, state->position.z);
+          attitudeControllerResetAllPID(stateEstimate->attitude.roll, stateEstimate->attitude.pitch, stateEstimate->attitude.yaw);
+          positionControllerResetAllPID(stateEstimate->position.x, stateEstimate->position.y, stateEstimate->position.z);
           isUsingFreefallController = false;
       }
     }                                        
@@ -261,11 +266,11 @@ void controllerPid(control_t *control, const setpoint_t *setpoint,
     cmd_pitch = control->pitch;
     cmd_yaw = control->yaw;
 
-    attitudeControllerResetAllPID(state->attitude.roll, state->attitude.pitch, state->attitude.yaw);
-    positionControllerResetAllPID(state->position.x, state->position.y, state->position.z);
+    attitudeControllerResetAllPID(stateEstimate->attitude.roll, stateEstimate->attitude.pitch, stateEstimate->attitude.yaw);
+    positionControllerResetAllPID(stateEstimate->position.x, stateEstimate->position.y, stateEstimate->position.z);
 
     // Reset the calculated YAW angle for rate control
-    attitudeDesired.yaw = state->attitude.yaw;
+    attitudeDesired.yaw = stateEstimate->attitude.yaw;
   }
 }
 
