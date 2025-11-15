@@ -61,3 +61,5 @@ examples/app_broadcast_pos/
 examples/hopcopter_controller/
 tools/usdlog/log00 11-10-46-959
 tools/usdlog/log01 11-10-53-838
+
+**/flight_logs/
