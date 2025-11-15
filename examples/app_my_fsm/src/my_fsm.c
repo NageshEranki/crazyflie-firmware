@@ -172,15 +172,12 @@ void setRecoverSetpoint(setpoint_t* setpoint, const float roll, const float pitc
   setpoint->mode.z = modeDisable;
 
   setpoint->mode.roll = modeAbs;
-  setpoint->attitudeRate.roll = 0;
   setpoint->attitude.roll = roll;
 
   setpoint->mode.pitch = modeAbs;
-  setpoint->attitudeRate.pitch = 0;
   setpoint->attitude.pitch = pitch;
   
   setpoint->mode.yaw = modeAbs;
-  setpoint->attitudeRate.yaw = 0;
   setpoint->attitude.yaw = yaw;
   
   setpoint->thrust = fminf(thrust, MAX_THRUST);
