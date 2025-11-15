@@ -18,6 +18,8 @@
 
 """
 
+import os
+import datetime
 import time
 import json
 import logging
@@ -32,6 +34,8 @@ from cflib import crtp
 from CrazyflieClient import CrazyflieClient
 
 from MotionCaptureForwardPoses import QualisysStreamProcessor
+
+from examples.app_my_fsm.python_helper.hash_helper import get_git_hash
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -69,6 +73,10 @@ MARKER_DECK_IDS = [1, 2, 3, 4]
 # lateral velocity at the apex of the ballistic phase.
 V_MAX       = 3.3           # m/s
 Z_APEX      = 0.78           # m
+
+#   Overshoot formula parameters
+OVERSHOOT_SLOPE = 0.45
+OVERSHOOT_INTERCEPT =  0.0055
 
 class QualisysForwardPose(QualisysStreamProcessor):
     """
@@ -126,12 +134,12 @@ def compute_overshoot(p_des: list[float, float], v_max: float):
     #   the regression coefficients
     # return np.array([0, 0])
 
-    # #   Use this formula for the exercise ball
+    # #   Used this formula for the exercise ball with some success
     # return 0.50 * v_max * n_vel + 0.0055
 
 
-    #   I don't remember what this formula is for...
-    return 0.45 * v_max * n_vel + 0.0055
+    #   Parameterize the formula; last known working values
+    return OVERSHOOT_SLOPE * v_max * n_vel + OVERSHOOT_INTERCEPT
 
 
 def switch_to_freefall(p_curr: list[float, float], p_apex: list[float, float], p_far):
@@ -345,9 +353,43 @@ if __name__ == '__main__':
     cf.disconnect()
     qtm_thread.stop()
 
-    cf.data['V_MAX'] = V_MAX
-    cf.data['P_LAND_DES'] = P_LAND_DES.tolist()
-    cf.data['Z_APEX'] = Z_APEX
+    #   Build metadata
+    CODE_VERSION = get_git_hash(repo_path="../../../")
+    script_name = os.path.basename(__file__)
+    script_base_name = os.path.splitext(script_name)[0]
+    TIMESTAMP = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
-    with open('data.json', 'w') as fh:
-            json.dump(cf.data, fh)
+    #   Build parameter data for this specific run
+    parameters_dict = {
+        "V_MAX": V_MAX,
+        "P_LAND_DES": P_LAND_DES.tolist(),
+        "Z_APEX": Z_APEX,
+        "OVERSHOOT_SLOPE": OVERSHOOT_SLOPE,
+        "OVERSHOOT_INTERCEPT": OVERSHOOT_INTERCEPT
+    }
+
+    #   Version, timestamp, parameters
+    metadata_dict = {
+        "code_version": CODE_VERSION,
+        "script_name": script_name,
+        "timestamp": TIMESTAMP,
+        "parameters": parameters_dict}
+
+    full_logs = {
+        "data": cf.data,
+        "metadata": metadata_dict
+    }
+
+    log_folder = "flight_logs/"
+    if not os.path.exists(log_folder):
+        os.makedirs(log_folder)
+
+    log_filename = os.path.join(
+        log_folder, 
+        f"log_{CODE_VERSION}_{script_base_name}_{TIMESTAMP}.json"
+    )
+
+    with open(log_filename, 'w') as f:
+        json.dump(full_logs, f, indent=4)
+
+    print(f"Log saved to: {log_filename}")
