@@ -35,7 +35,7 @@ from CrazyflieClient import CrazyflieClient
 
 from MotionCaptureForwardPoses import QualisysStreamProcessor
 
-from examples.app_my_fsm.python_helper.hash_helper import get_git_hash
+from hash_helper import get_git_hash
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -377,7 +377,8 @@ if __name__ == '__main__':
 
     full_logs = {
         "data": cf.data,
-        "metadata": metadata_dict
+        "metadata": metadata_dict,
+        "mocap": qtm_thread.client.data
     }
 
     log_folder = "flight_logs/"
