@@ -100,8 +100,8 @@ class QualisysClient(Thread):
         while (self._stay_open):
             await asyncio.sleep(1)
         # Save data before closing thread
-        with open('motion_capture_data.json', 'w') as outfile:
-            json.dump(self.data, outfile, sort_keys=False)
+        # with open('motion_capture_data.json', 'w') as outfile:
+        #     json.dump(self.data, outfile, sort_keys=False)
         
         await self._close()
 
