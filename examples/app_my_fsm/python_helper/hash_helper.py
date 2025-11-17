@@ -8,7 +8,8 @@ import os
 MY_CODE_FOLDERS_TO_TRACK = [
     'examples/app_my_fsm/src/',           # <-- CHANGE THIS: Assumed path to your C code
     'examples/app_my_fsm/client_code/',   # <-- CHANGE THIS: Path to your python code
-    'examples/app_my_fsm/python_helper/'
+    'examples/app_my_fsm/python_helper/',
+    'src'
 ]
 # ---------------------------
 
