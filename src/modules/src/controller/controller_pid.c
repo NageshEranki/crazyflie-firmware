@@ -230,7 +230,7 @@ void controllerPid(control_t *control, const setpoint_t *setpoint,
     }else
     {
       // Enable tilt-priority allocation for SLOWDOWN state
-      use_tilt_priority = (state == SLOWDOWN);
+      use_tilt_priority = (state != NORMAL);
 
       // Reset if switching back to stock controller
       if (isUsingFreefallController) {
