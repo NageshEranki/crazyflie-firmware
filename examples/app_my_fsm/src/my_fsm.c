@@ -36,17 +36,22 @@
 #include "math3d.h"
 #include "app.h"
 #include "log.h"
+#include "param.h"
 #include "commander.h"
 #include "crtp_commander_high_level.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "controller_pid.h"
 
 #define DEBUG_MODULE "FSM"
 
 #include "debug.h"
 #include "my_fsm.h"
 
-
+static float RECOVER_ROLL_KP  = 175.0f;
+static float RECOVER_ROLL_KD  = 95.0f;
+static float RECOVER_PITCH_KP = 175.0f;
+static float RECOVER_PITCH_KD = 95.0f;
 
 
 StateType state = NORMAL;
@@ -272,6 +277,12 @@ void appMain() {
         state = RECOVER;
         // startTickCount = xTaskGetTickCount();
         DEBUG_PRINT("Crashed!\n");
+
+        pidFreeFallRoll.kp = RECOVER_ROLL_KP;
+        pidFreeFallRoll.kd = RECOVER_ROLL_KD;
+
+        pidFreeFallPitch.kp = RECOVER_PITCH_KP;
+        pidFreeFallPitch.kd = RECOVER_PITCH_KD;
       }
       break;
     
@@ -360,3 +371,10 @@ LOG_GROUP_START(my_fsm)
 LOG_ADD(LOG_UINT8, curr_state, &state)
 
 LOG_GROUP_STOP(my_fsm)
+
+PARAM_GROUP_START(my_fsm)
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT,  rec_pKp, &RECOVER_PITCH_KP)
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT,  rec_pKd, &RECOVER_PITCH_KD)
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT,  rec_rKp, &RECOVER_ROLL_KP)
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT,  rec_rKd, &RECOVER_ROLL_KD)
+PARAM_GROUP_STOP(my_fsm)

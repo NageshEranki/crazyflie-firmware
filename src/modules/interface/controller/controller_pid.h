@@ -27,6 +27,15 @@
 #define __CONTROLLER_PID_H__
 
 #include "stabilizer_types.h"
+#include "pid.h"
+
+#define PITCH_KP              150.0
+#define PITCH_KD              90.0
+#define ROLL_KP               150.0
+#define ROLL_KD               90.0
+
+extern PidObject pidFreeFallRoll;
+extern PidObject pidFreeFallPitch;
 
 void controllerPidInit(void);
 bool controllerPidTest(void);

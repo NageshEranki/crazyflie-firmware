@@ -78,6 +78,12 @@ Z_APEX      = 0.78           # m
 OVERSHOOT_SLOPE = 0.45
 OVERSHOOT_INTERCEPT =  0.0055
 
+#   Recovery PD attitude control gains
+RECOVER_ROLL_KP     =   180 
+RECOVER_ROLL_KD     =   95
+RECOVER_PITCH_KP    =   180
+RECOVER_PITCH_KD    =   95
+
 class QualisysForwardPose(QualisysStreamProcessor):
     """
 
@@ -189,6 +195,16 @@ def initialize_systems(config):
     # Wait for connection
     while not cf.is_fully_connected:
         time.sleep(0.1)
+
+    cf.cf.param.set_value("my_fsm.rec_pKp", RECOVER_PITCH_KP)
+    time.sleep(0.1)
+    cf.cf.param.set_value("my_fsm.rec_pKd", RECOVER_PITCH_KD)
+    time.sleep(0.1)
+
+    cf.cf.param.set_value("my_fsm.rec_rKp", RECOVER_ROLL_KP)
+    time.sleep(0.1)
+    cf.cf.param.set_value("my_fsm.rec_rKd", RECOVER_ROLL_KD)
+    time.sleep(0.1)
     
     qtm_thread = QualisysForwardPose(
         ip_address=config.QTM_SERVER_ADDRESS,
@@ -365,7 +381,11 @@ if __name__ == '__main__':
         "P_LAND_DES": P_LAND_DES.tolist(),
         "Z_APEX": Z_APEX,
         "OVERSHOOT_SLOPE": OVERSHOOT_SLOPE,
-        "OVERSHOOT_INTERCEPT": OVERSHOOT_INTERCEPT
+        "OVERSHOOT_INTERCEPT": OVERSHOOT_INTERCEPT,
+        "RECOVER_ROLL_KP": RECOVER_ROLL_KP,
+        "RECOVER_ROLL_KD": RECOVER_ROLL_KD,
+        "RECOVER_PITCH_KP": RECOVER_PITCH_KP,
+        "RECOVER_PITCH_KD": RECOVER_PITCH_KD
     }
 
     #   Version, timestamp, parameters

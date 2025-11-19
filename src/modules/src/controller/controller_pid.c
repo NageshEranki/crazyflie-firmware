@@ -16,10 +16,10 @@
 #include "../../examples/app_my_fsm/src/my_fsm.h"
 
 #define ATTITUDE_UPDATE_DT    (float)(1.0f/ATTITUDE_RATE)
-#define PITCH_KP              150.0
-#define PITCH_KD              90.0
-#define ROLL_KP               150.0
-#define ROLL_KD               90.0
+// #define PITCH_KP              150.0
+// #define PITCH_KD              90.0
+// #define ROLL_KP               150.0
+// #define ROLL_KD               90.0
 
 static attitude_t attitudeDesired;
 static attitude_t rateDesired;
@@ -38,7 +38,9 @@ static float accelz;
 // Variables for the second attitude controller
 // To be used for manual or free-fall flight
 static bool isUsingFreefallController = false;
-static PidObject pidFreeFallRoll = {
+
+
+PidObject pidFreeFallRoll = {
   .kp =  ROLL_KP,
   .ki = 0.0f,
   .kd = ROLL_KD,
@@ -46,7 +48,7 @@ static PidObject pidFreeFallRoll = {
   .outputLimit = UINT16_MAX/4
 };
 
-static PidObject pidFreeFallPitch = {
+PidObject pidFreeFallPitch = {
   .kp =  PITCH_KP,
   .ki = 0.0f,
   .kd = PITCH_KD,
