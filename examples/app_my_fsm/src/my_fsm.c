@@ -269,10 +269,18 @@ void appMain() {
     switch (state)
     {
     case NORMAL:
+      if(acc_z > ACC_Z_IMPACT_THRESH)
+      {
+        state = IMPACT;
+        memset(&setpoint, 0, sizeof(setpoint_t));
+        commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP);
+      }
+      break;
+    case IMPACT:
       
       //  The precise threshold to determine impact/bouncing
       //  is currently known through experiment
-      if(acc_z > ACC_Z_THRESHOLD)
+      if(fabsf(acc_z) < ACC_Z_REC_THRESH)
       {
         state = RECOVER;
         // startTickCount = xTaskGetTickCount();
@@ -283,6 +291,10 @@ void appMain() {
 
         pidFreeFallPitch.kp = RECOVER_PITCH_KP;
         pidFreeFallPitch.kd = RECOVER_PITCH_KD;
+      }
+      else{
+        memset(&setpoint, 0, sizeof(setpoint_t));
+        commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP);
       }
       break;
     

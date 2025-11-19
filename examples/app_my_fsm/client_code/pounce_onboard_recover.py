@@ -80,9 +80,9 @@ OVERSHOOT_INTERCEPT =  0.0055
 
 #   Recovery PD attitude control gains
 RECOVER_ROLL_KP     =   180 
-RECOVER_ROLL_KD     =   95
+RECOVER_ROLL_KD     =   85
 RECOVER_PITCH_KP    =   180
-RECOVER_PITCH_KD    =   95
+RECOVER_PITCH_KD    =   85
 
 class QualisysForwardPose(QualisysStreamProcessor):
     """

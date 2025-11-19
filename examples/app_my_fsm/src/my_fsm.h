@@ -18,7 +18,8 @@
 #define MAX_THRUST  60000
 
 //  Define some parameters/thresholds
-static const float ACC_Z_THRESHOLD = 2.5f;
+static const float ACC_Z_IMPACT_THRESH = 2.5f;
+static const float ACC_Z_REC_THRESH = 0.1f;
 static const float ROLL_RECOVER = 0.0f;
 static const float PITCH_RECOVER = 0.0f;
 static const float YAW_RECOVER = 0.0f;
@@ -37,7 +38,8 @@ typedef enum
   NORMAL,
   RECOVER,
   HOLD,
-  SLOWDOWN
+  SLOWDOWN,
+  IMPACT
 } StateType;
 
 extern StateType state;
