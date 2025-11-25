@@ -208,6 +208,23 @@ void setHoldSetpoint(setpoint_t* setpoint, const float x, const float y, const f
 }
 
 
+void setSlowDown2Setpoint(setpoint_t* setpoint, const float x, const float y, const float z)
+{
+
+  setpoint->mode.x = modeAbs;
+  setpoint->position.x = x;
+  
+  setpoint->mode.y = modeAbs;
+  setpoint->position.y = y;
+
+  setpoint->mode.z = modeAbs;
+  setpoint->position.z = z;  
+  
+  setpoint->mode.yaw = modeVelocity;
+  setpoint->attitudeRate.yaw = 0.0f;
+    
+}
+
 void setSlowDownSetpoint(setpoint_t* setpoint)
 {
 
@@ -227,25 +244,6 @@ void setSlowDownSetpoint(setpoint_t* setpoint)
 
 void appMain() {
 
-  // DEBUG_PRINT("Waiting for activation ...\n");
-
-  // //  Extract the log ID for the accelerometer (z)
-  // logVarId_t idAccZ  = logGetVarId("acc", "z");
-  
-  // logVarId_t idPx   = logGetVarId("stateEstimate", "x");
-  // logVarId_t idPy   = logGetVarId("stateEstimate", "y");
-  // logVarId_t idPz   = logGetVarId("stateEstimate", "z");
-  // logVarId_t idYaw  = logGetVarId("stateEstimate", "yaw");
-
-  // float acc_z;
-
-  // float px = 0;
-  // float py = 0;
-  // float pz = 0;
-  // float yaw = 0;
-
-  // //  Initialize the FSM with a state
-  // StateType state = NORMAL;
 
   appSetup();
 
@@ -257,7 +255,8 @@ void appMain() {
   //  will scream at you for some reason....
   TickType_t startTickCount = xTaskGetTickCount();
 
-  while(1) {
+  bool run_loop = true;
+  while(run_loop) {
 
     // Iterate the FSM every 10 milliseconds
     vTaskDelay(M2T(10));
@@ -319,24 +318,6 @@ void appMain() {
       if(fabsf(alpha) < ALPHA_THRESHOLD && fabsf(omega_xy_mag) < OMEGA_THRESHOLD)
       {
 
-        // // The first solution
-        // state = NORMAL;
-
-        // //  You need to call commanderRelaxPriority() to avoid the
-        // //  supervisor watchdog from locking the quadrotor.
-        // commanderRelaxPriority();
-
-        // // The second solution
-        // state = HOLD;
-        // commanderRelaxPriority();
-        // startTickCount = xTaskGetTickCount();
-
-        // px = logGetFloat(idPx);
-        // py = logGetFloat(idPy);
-        // pz = logGetFloat(idPz);
-    
-        // yaw = logGetFloat(idYaw);
-
         state = SLOWDOWN;
         commanderRelaxPriority();
         // startTickCount = xTaskGetTickCount();
@@ -344,12 +325,26 @@ void appMain() {
       break;
     
     case HOLD:
-      setHoldSetpoint(&setpoint, px_hold, py_hold, pz_hold, yaw_hold);
-      commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP);
-      if(xTaskGetTickCount()-startTickCount >= HOLD_TIME_SPAN)
+      // setHoldSetpoint(&setpoint, px_hold, py_hold, pz_hold, yaw_hold);
+      // commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP);
+      // if(xTaskGetTickCount()-startTickCount >= HOLD_TIME_SPAN)
+      // {
+      //   state = NORMAL;
+      //   commanderRelaxPriority();
+      // }
+      int status = crtpCommanderHighLevelGoTo2(px_hold, py_hold, pz_hold, radians(yaw_hold), 1.0f, false, false);
+      if(status != 0)
+      {
+        run_loop = false;
+        break;
+      }
+      state = HOLDING;
+      break;
+    
+    case HOLDING:
+      if(crtpCommanderHighLevelIsTrajectoryFinished())
       {
         state = NORMAL;
-        commanderRelaxPriority();
       }
       break;
 
@@ -357,8 +352,34 @@ void appMain() {
       setSlowDownSetpoint(&setpoint);
       commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP);
       // if(xTaskGetTickCount()-startTickCount >= SLOWDOWN_TIME_SPAN)
-      float v_xyz_mag = vmag(mkvec(vx, vy, vz));
-      if(fabsf(v_xyz_mag) < V_XY_THRESHOLD && fabsf(pz-HOLD_ALTITUDE) < 0.1f)
+      float v_xy_mag = vmag(mkvec(vx, vy, 0.0f));
+      // if(fabsf(v_xy_mag) < V_XY_THRESHOLD && fabsf(pz-HOLD_ALTITUDE) < 0.1f)
+      // {
+      //   state = HOLD;
+      //   commanderRelaxPriority();
+      //   startTickCount = xTaskGetTickCount();
+
+      //   px_hold = px;
+      //   py_hold = py;
+      //   pz_hold = pz;
+      //   yaw_hold = yaw;
+      // }
+      if(fabsf(v_xy_mag) < V_XY_THRESHOLD && fabsf(pz-HOLD_ALTITUDE) < 0.1f)
+      {
+        state = SLOWDOWN2;
+        commanderRelaxPriority();
+        startTickCount = xTaskGetTickCount();
+
+        px_hold = px;
+        py_hold = py;
+        // pz_hold = pz;
+        // yaw_hold = yaw;
+      }  
+      break;
+    case SLOWDOWN2:
+      setSlowDown2Setpoint(&setpoint, px_hold, py_hold, HOLD_ALTITUDE);
+      commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP);
+      if(fabsf(vz) < V_XY_THRESHOLD && fabsf(pz-HOLD_ALTITUDE) < 0.1f)
       {
         state = HOLD;
         commanderRelaxPriority();
@@ -368,7 +389,7 @@ void appMain() {
         py_hold = py;
         pz_hold = pz;
         yaw_hold = yaw;
-      }      
+      }
       break;
     default:
       break;

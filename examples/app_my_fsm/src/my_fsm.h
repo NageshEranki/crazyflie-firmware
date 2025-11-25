@@ -39,7 +39,9 @@ typedef enum
   RECOVER,
   HOLD,
   SLOWDOWN,
-  IMPACT
+  IMPACT,
+  HOLDING,
+  SLOWDOWN2
 } StateType;
 
 extern StateType state;

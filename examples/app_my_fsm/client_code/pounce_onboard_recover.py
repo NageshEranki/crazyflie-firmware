@@ -64,7 +64,10 @@ DRONE_LOG_VARIABLES = [
     'pid_freefall.pitch_outP', 'pid_freefall.pitch_outD',
     'pid_freefall.roll_outP', 'pid_freefall.roll_outD',
     'pid_freefall.yaw_outP', 'pid_freefall.yaw_outD',
-    'my_fsm.curr_state'
+    'my_fsm.curr_state',
+    'kalman.stateD0', 'kalman.stateD1', 'kalman.stateD2',
+    'kalman.varX', 'kalman.varY', 'kalman.varZ', 'kalman.varPX', 'kalman.varPY', 'kalman.varPZ',
+    'kalman.varD0', 'kalman.varD1', 'kalman.varD2'
 ]
 
 MARKER_DECK_IDS = [1, 2, 3, 4]
@@ -72,7 +75,7 @@ MARKER_DECK_IDS = [1, 2, 3, 4]
 # The max lateral velocity. This is also assumed to be the
 # lateral velocity at the apex of the ballistic phase.
 V_MAX       = 3.3           # m/s
-Z_APEX      = 0.78           # m
+Z_APEX      = 0.75           # m
 
 #   Overshoot formula parameters
 OVERSHOOT_SLOPE = 0.45
@@ -363,7 +366,7 @@ if __name__ == '__main__':
     # May be helpful in debugging
     # cf.stop(5.0)
 
-    time.sleep(5.0)
+    time.sleep(10.0)
 
 
     cf.disconnect()
