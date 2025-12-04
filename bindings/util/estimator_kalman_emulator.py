@@ -29,6 +29,9 @@ class EstimatorKalmanEmulator:
         self.PREDICT_RATE = 100
         self.PREDICT_STEP_MS = 1000 / self.PREDICT_RATE
 
+        self.EXT_POS_STD_DEV = 0.01
+        self.EXT_QUAT_STD_DEV = 4.5e-3
+
         self._is_initialized = False
 
     def run_one_1khz_iteration(self, sensor_samples) -> tuple[float, cffirmware.state_t]:
@@ -139,3 +142,26 @@ class EstimatorKalmanEmulator:
             gyro.z = float(gyro_data['gyro.z'])
 
             cffirmware.axis3fSubSamplerAccumulate(self.gyroSubSampler, gyro)
+        
+        if sample[0] == 'estExtPose':
+            ext_pose = cffirmware.poseMeasurement_t()
+            ext_quat = cffirmware.quaternion_t()
+            
+            pose_data = sample[1]
+
+            ext_pose.x = float(pose_data['pos_x'])
+            ext_pose.y = float(pose_data['pos_y'])
+            ext_pose.z = float(pose_data['pos_z'])
+
+            ext_quat.x = float(pose_data['quat_x'])
+            ext_quat.y = float(pose_data['quat_y'])
+            ext_quat.z = float(pose_data['quat_z'])
+            ext_quat.w = float(pose_data['quat_w'])
+
+            ext_pose.quat = ext_quat
+
+            ext_pose.stdDevPos = float(pose_data.get('stdDevPos', self.EXT_POS_STD_DEV))
+            ext_pose.stdDevQuat = float(pose_data.get('stdDevQuat', self.EXT_QUAT_STD_DEV))
+
+            cffirmware.kalmanCoreUpdateWithPose(self.coreData, ext_pose)
+
